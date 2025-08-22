@@ -7,6 +7,9 @@ import io
 import re
 import textwrap, os, re, io, json, math, datetime as dt
 from typing import List, Dict, Optional, Tuple
+import json
+import re
+from pathlib import Path
 
 st.markdown("""
     <style>
@@ -53,10 +56,10 @@ st.markdown("<div style='height:28px;'></div>", unsafe_allow_html=True)  # ⬅�
 # -------- Sidebar Uploads --------
 with st.sidebar:
     st.header("Upload files")
-    train_files = st.file_uploader("Train Cost · 班列站到站 (support multiple files)", type=["xls", "xlsx"], accept_multiple_files=True)
+    train_files = st.file_uploader("Train Cost|T-T (support multiple files)", type=["xls", "xlsx"], accept_multiple_files=True)
     buffer_file = st.file_uploader("Buffer", type=["xls", "xlsx"])
-    truck_file = st.file_uploader("Truck · 门到站拖车费", type=["xls", "xlsx"])
-    st.markdown("---")
+    truck_file = st.file_uploader("Truck|拖车费", type=["xls", "xlsx"])
+    # st.markdown("---")
     st.markdown("> 说明：本应用**不保存**任何数据；所有处理都在内存完成。")
 
 # ---------- Column picking logic ----------
@@ -72,7 +75,7 @@ STD_COLS = {
     "remark": ["remark", "remarks", "备注", "说明"],
 }
 
-NEED_ORDER = ["Flow", "Origin Terminal","Route","Dest Terminal","Service Scope","Lead-Time(Day)","container type", "cost","leasing", "valid from","valid to","remark"]
+NEED_ORDER = ["Flow", "Origin Terminal","Route","Dest Terminal","Service Scope","Lead-Time(Day)","Container Type", "cost","leasing", "valid from","valid to","remark"]
 
 def pick_first_match(colnames, patterns):
     # 确保列名都是字符串
@@ -101,37 +104,6 @@ def detect_leasing_col(colnames):
             return c
     return None
 
-# def normalize_train_cost(df: pd.DataFrame, source_file: str) -> pd.DataFrame:
-#     cols = df.columns.tolist()
-#     out = pd.DataFrame()
-
-#     # map fixed columns
-#     for std_name, pats in STD_COLS.items():
-#         src = pick_first_match(cols, pats)
-#         if src is not None:
-#             out[std_name] = df[src]
-#         else:
-#             out[std_name] = np.nan
-
-#     # numbers
-#     lt_col = pick_first_match(cols, STD_COLS["Lead-Time(Day)"])
-#     if lt_col: out["Lead-Time(Day)"] = pd.to_numeric(df[lt_col], errors="coerce")
-
-#     cost_col = detect_cost_col(cols)
-#     leasing_col = detect_leasing_col(cols)
-#     out["cost"] = pd.to_numeric(df[cost_col], errors="coerce") if cost_col else np.nan
-#     out["leasing"] = pd.to_numeric(df[leasing_col], errors="coerce") if leasing_col else np.nan
-
-#     # trim spaces
-#     for c in ["Origin Terminal","Route","Dest Terminal","Service Scope","valid from","valid to","remark"]:
-#         out[c] = out[c].astype(str).str.strip()
-
-#     # Keep only the specified order
-#     out = out[[c for c in NEED_ORDER if c in out.columns]]
-
-#     # Attach source file for debugging (not exported)
-#     out["__source_file__"] = source_file
-#     return out
 # 用括号把整个数字模式包起来（有一个捕获组）
 RE_NUM = r'(-?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)'
 
@@ -173,22 +145,22 @@ def normalize_train_cost(df: pd.DataFrame, source_file: str) -> pd.DataFrame:
     # 最终 cost = 所有 cost 之和 + leasing
     out["cost"] = cost_sum + leasing_num
 
-    # 4) container type：取含 container 的列的第一个非空
+    # 4) Container Type：取含 container 的列的第一个非空
     container_cols = [c for c in cols if "container" in c.lower()]
     if container_cols:
         tmp = df[container_cols].astype(str).replace({"nan": np.nan, "None": np.nan}).bfill(axis=1)
-        out["container type"] = tmp.iloc[:, 0].astype(str).str.strip()
-        out.loc[out["container type"].isin(["", "nan", "None"]), "container type"] = np.nan
+        out["Container Type"] = tmp.iloc[:, 0].astype(str).str.strip()
+        out.loc[out["Container Type"].isin(["", "nan", "None"]), "Container Type"] = np.nan
 
     # 5) 文本列去空格 
-    for c in ["Flow","Origin Terminal","Route","Dest Terminal","Service Scope","valid from","valid to","remark","container type"]:
+    for c in ["Flow","Origin Terminal","Route","Dest Terminal","Service Scope","valid from","valid to","remark","Container Type"]:
         if c in out.columns:
             out[c] = out[c].astype(str).str.strip()
 
     # 6) 列顺序
     ordered = [c for c in NEED_ORDER if c in out.columns]  
-    if "container type" in out.columns and "container type" not in ordered:
-        ordered.append("container type")
+    if "Container Type" in out.columns and "Container Type" not in ordered:
+        ordered.append("Container Type")
     out = out.reindex(columns=ordered)
 
     out["__source_file__"] = source_file
@@ -214,13 +186,10 @@ if train_files:
     df_train = all_train.dropna(how="all")
     df_train = df_train.dropna(subset=["cost"])
     #df_train["leasing"] = fix_leasing(df_train["leasing"])
-
     # show combined table
     with st.expander("查看合并后的Train Cost"):
         st.success(f"Train Cost 已加载，合并后 {len(df_train)} 行。")
         st.dataframe(df_train[NEED_ORDER], use_container_width=True)
-else:
-    st.info("请在左侧上传 Train Cost 文件（可多选）。")
 
 # ---------- Truck Data Processing ----------
 if truck_file:
@@ -277,8 +246,6 @@ if truck_file:
     with st.expander("查看合并后的拖车费数据"):
         st.success(f"拖车费数据已加载，合并后 {len(df_truck)} 行。")
         st.dataframe(df_truck, use_container_width=True)
-else:
-    st.info("请在左侧上传 FCL Net Cost 文件。")
 
 # ---------- Buffer Data Processing ----------
 if buffer_file:
@@ -289,267 +256,290 @@ if buffer_file:
     with st.expander("查看Buffer数据"):
         st.success(f"Buffer数据已加载，合并后 {len(df_buffer)} 行。")
         st.dataframe(df_buffer, use_container_width=True)
-else:
-    st.info("请在左侧上传 Buffer 文件。")
 
 # ---------- Main ----------
-def _pick_first(colnames, keys):
-    colnames = [str(c) for c in colnames]
-    for k in keys:
-        k = k.lower()
-        for c in colnames:
-            if k in c.lower():
-                return c
-    return None
+def build_total_cost_table(df_buffer: pd.DataFrame,
+                           df_train: pd.DataFrame,
+                           df_truck: pd.DataFrame) -> pd.DataFrame:
 
-def normalize_truck(df_truck: pd.DataFrame) -> pd.DataFrame:
-    """
-    规范化拖车表 -> 长表：
-    返回列：City, Terminal, Direction(Export/Import), Truck_Cost, Truck_Buffer
-    支持两种形态：
-      1) 只有一列 Cost（则视为进出口同价）
-      2) 分别有 Export/Import 成本列；可选 Buffer 列
-    """
-    df = df_truck.copy()
-    cols = df.columns.tolist()
+    # ---------- 小工具 ----------
+    def _norm_cols(df):
+        d = df.copy()
+        d.columns = [c.strip() for c in d.columns]
+        return d
 
-    city_col = _pick_first(cols, ["pickup/delivery city", "city", "国内城市"])
-    # 站点列可能叫 Origin Terminal / Dest Terminal（你的整理里保留了 Origin Terminal）
-    term_col = _pick_first(cols, ["origin terminal", "terminal", "站点", "ramp", "station"])
-    if city_col is None or term_col is None:
-        st.error("拖车表缺少城市或站点列（如 Pickup/Delivery City, Origin Terminal）。")
-        return pd.DataFrame(columns=["City","Terminal","Direction","Truck_Cost","Truck_Buffer"])
+    def _as_num(s):
+        return pd.to_numeric(s, errors="coerce")
 
-    # 价格列
-    exp_cost_col = _pick_first(cols, ["export cost", "export_rate", "export", "exp cost"])
-    imp_cost_col = _pick_first(cols, ["import cost", "import_rate", "import", "imp cost"])
-    one_cost_col = _pick_first(cols, ["cost", "price", "rate"])  # 只有单列时使用
-    # 拖车 buffer（可选）
-    exp_buf_col = _pick_first(cols, ["export buffer", "exp buffer", "export surcharge"])
-    imp_buf_col = _pick_first(cols, ["import buffer", "imp buffer", "import surcharge"])
-    one_buf_col = _pick_first(cols, ["buffer", "surcharge", "add"])  # 单列 buffer（少见）
+    def _is_cq(x: str) -> bool:
+        if not isinstance(x, str):
+            return False
+        s = x.strip().lower()
+        return s in {"chongqing", "重庆"}
+    
+    def _is_cq_bool_series(s: pd.Series) -> pd.Series:
+    # 统一为 object，逐个元素调用 _is_cq；缺失值 -> False；最后强转为 numpy bool
+        return s.astype(object).map(_is_cq).fillna(False).astype(bool)
 
-    out = []
+    # ---------- 统一列名空格/大小写 ----------
+    df_buffer = _norm_cols(df_buffer)
+    df_train  = _norm_cols(df_train)
+    df_truck  = _norm_cols(df_truck)
 
-    def to_num(x):
-        return pd.to_numeric(x, errors="coerce")
+    # 关键字段统一为 string 去空格，避免合并时匹配失败
+    for d in (df_buffer, df_train, df_truck):
+        for k in ["Origin Terminal", "Route", "Dest Terminal", "Container Type"]:
+            if k in d.columns:
+                d[k] = d[k].astype("string").str.strip()
 
-    if exp_cost_col or imp_cost_col:
-        # 分列版：逐行拉平
-        for _, r in df.iterrows():
-            # Export 行
-            if exp_cost_col:
-                out.append({
-                    "City": r[city_col],
-                    "Terminal": r[term_col],
-                    "Direction": "Export",
-                    "Truck_Cost": to_num(r.get(exp_cost_col, 0)) if exp_cost_col else 0,
-                    "Truck_Buffer": to_num(r.get(exp_buf_col, 0)) if exp_buf_col else 0,
-                })
-            # Import 行
-            if imp_cost_col:
-                out.append({
-                    "City": r[city_col],
-                    "Terminal": r[term_col],
-                    "Direction": "Import",
-                    "Truck_Cost": to_num(r.get(imp_cost_col, 0)) if imp_cost_col else 0,
-                    "Truck_Buffer": to_num(r.get(imp_buf_col, 0)) if imp_buf_col else 0,
-                })
-    else:
-        # 单列版：复制两行（Export/Import同价）
-        if one_cost_col is None:
-            st.error("拖车表未找到成本列（如 Cost/Rate/Price）。")
-            return pd.DataFrame(columns=["City","Terminal","Direction","Truck_Cost","Truck_Buffer"])
+    # ---------- 1) Buffer + Train 四键合并，得到 T-T 基础 ----------
+    merge_keys = ["Origin Terminal", "Route", "Dest Terminal", "Container Type"]
+    missing_in_buffer = [k for k in merge_keys if k not in df_buffer.columns]
+    missing_in_train  = [k for k in merge_keys if k not in df_train.columns]
+    if missing_in_buffer:
+        raise ValueError(f"Buffer 缺少字段: {missing_in_buffer}")
+    if missing_in_train:
+        raise ValueError(f"Train 缺少字段: {missing_in_train}")
 
-        for _, r in df.iterrows():
-            for d in ["Export", "Import"]:
-                out.append({
-                    "City": r[city_col],
-                    "Terminal": r[term_col],
-                    "Direction": d,
-                    "Truck_Cost": to_num(r.get(one_cost_col, 0)),
-                    "Truck_Buffer": to_num(r.get(one_buf_col, 0)) if one_buf_col else 0,
-                })
-
-    out = pd.DataFrame(out)
-    if out.empty:
-        return out
-
-    # 清洗
-    out["City"] = out["City"].astype(str).str.strip()
-    out["Terminal"] = out["Terminal"].astype(str).str.strip()
-    out["Direction"] = out["Direction"].astype(str)
-    out["Truck_Cost"] = pd.to_numeric(out["Truck_Cost"], errors="coerce").fillna(0.0)
-    out["Truck_Buffer"] = pd.to_numeric(out["Truck_Buffer"], errors="coerce").fillna(0.0)
-
-    # 去掉无效
-    out = out[(out["City"] != "") & (out["Terminal"] != "")]
-    return out
-
-def normalize_rail(df_train: pd.DataFrame, use_leasing=True) -> pd.DataFrame:
-    """
-    规范化铁路费（含线路）：
-    输入：df_train 至少含 Origin Terminal, Dest Terminal, cost；若含 Route/Route 也会带上
-    输出列：Origin Terminal, Dest Terminal, Route(可选), Rail_Cost
-    """
-    need_cols_base = ["Origin Terminal", "Dest Terminal", "cost"]
-    for c in need_cols_base:
-        if c not in df_train.columns:
-            st.error(f"Train Cost 缺少列：{c}")
-            return pd.DataFrame(columns=["Origin Terminal","Dest Terminal","Route","Rail_Cost"])
-
-    rail = df_train.copy()
-    rail["Origin Terminal"] = rail["Origin Terminal"].astype(str).str.strip()
-    rail["Dest Terminal"]   = rail["Dest Terminal"].astype(str).str.strip()
-
-    # 找线路列（Route/Route/线路）
-    Route_col = None
-    Route_col = Route_col or ("Route" if "Route" in rail.columns else None)
-    Route_col = Route_col or _pick_first(rail.columns, ["route", "线路"])
-    if Route_col and Route_col != "Route":
-        rail["Route"] = rail[Route_col]
-    elif "Route" not in rail.columns:
-        rail["Route"] = np.nan  # 统一列存在，可能全空
-
-    rail_cost = pd.to_numeric(rail["cost"], errors="coerce").fillna(0.0)
-    if use_leasing and "leasing" in rail.columns:
-        rail_cost = rail_cost + pd.to_numeric(rail["leasing"], errors="coerce").fillna(0.0)
-    rail["Rail_Cost"] = rail_cost
-
-    key_cols = ["Origin Terminal", "Dest Terminal", "Route"]
-    rail_out = rail.groupby(key_cols, as_index=False)["Rail_Cost"].sum()
-    return rail_out
-
-def normalize_buffer(df_buffer: pd.DataFrame) -> pd.DataFrame:
-    """
-    规范化铁路段 Buffer：
-    优先使用含线路键 (Origin, Dest, Route)，否则使用 (Origin, Dest) 并对各 Route 广播。
-    输出：Origin Terminal, Dest Terminal, Route(可能为空), Rail_Buffer
-    """
-    base_need = ["Origin Terminal", "Dest Terminal", "Buffer"]
-    for c in base_need:
-        if c not in df_buffer.columns:
-            st.error(f"Buffer 缺少列：{c}")
-            return pd.DataFrame(columns=["Origin Terminal","Dest Terminal","Route","Rail_Buffer"])
-
-    buf = df_buffer.copy()
-    buf["Origin Terminal"] = buf["Origin Terminal"].astype(str).str.strip()
-    buf["Dest Terminal"]   = buf["Dest Terminal"].astype(str).str.strip()
-    buf["Buffer"] = pd.to_numeric(buf["Buffer"], errors="coerce").fillna(0.0)
-
-    # 识别线路列
-    Route_col = None
-    Route_col = Route_col or ("Route" if "Route" in buf.columns else None)
-    Route_col = Route_col or _pick_first(buf.columns, ["route", "线路"])
-    if Route_col and Route_col != "Route":
-        buf["Route"] = buf[Route_col]
-    elif "Route" not in buf.columns:
-        buf["Route"] = np.nan
-
-    # 如果 Buffer 没有线路维度，就只按 (O,D) 聚合
-    if buf["Route"].isna().all():
-        buf_out = buf.groupby(["Origin Terminal","Dest Terminal"], as_index=False)["Buffer"].sum()
-        buf_out["Route"] = np.nan
-    else:
-        buf_out = buf.groupby(["Origin Terminal","Dest Terminal","Route"], as_index=False)["Buffer"].sum()
-
-    buf_out = buf_out.rename(columns={"Buffer": "Rail_Buffer"})
-    return buf_out
-
-def build_total(df_truck_long: pd.DataFrame,
-                df_rail: pd.DataFrame,
-                df_buf: pd.DataFrame) -> pd.DataFrame:
-    """
-    生成总表（含 Route 维度）：
-      Export:  City→Origin(拖车 Export) + Origin→Dest(铁路, 路线)
-      Import:  Origin→Dest(铁路, 路线) + Dest→City(拖车 Import)
-    输出列：City, Origin Terminal, Dest Terminal, Route, Direction, Cost, Buffer, Total
-    """
-    # ---- 将铁路 Buffer 合到铁路，优先按 (O,D,Route) 匹配，匹配不到时退化为 (O,D) ----
-    rail = df_rail.copy()
-    # 先尝试按三键 merge
-    merged = rail.merge(
-        df_buf, on=["Origin Terminal","Dest Terminal","Route"], how="left"
+    tt_base = df_buffer.merge(
+        df_train,
+        on=merge_keys,
+        how="inner",
+        suffixes=("", "_train")
     )
-    # 对于三键没匹配到且 buf 只有 (O,D) 的情况，再用 (O,D) 回填
-    if "Rail_Buffer" not in merged.columns:
-        merged["Rail_Buffer"] = 0.0
-    needs_fill = merged["Rail_Buffer"].isna()
-    if needs_fill.any():
-        od_buf = df_buf[df_buf["Route"].isna()][["Origin Terminal","Dest Terminal","Rail_Buffer"]].drop_duplicates()
-        merged.loc[needs_fill, "Rail_Buffer"] = merged[needs_fill].merge(
-            od_buf, on=["Origin Terminal","Dest Terminal"], how="left"
-        )["Rail_Buffer_y"].values
-    merged["Rail_Buffer"] = pd.to_numeric(merged["Rail_Buffer"], errors="coerce").fillna(0.0)
 
-    rail = merged  # 现在 rail 里有 Rail_Cost 与 Rail_Buffer，与 Route 对齐
+    # 数值化
+    if "Buffer" not in tt_base.columns:
+        raise ValueError("Buffer 表中缺少 'Buffer' 列")
+    for c in ["Buffer", "cost", "leasing", "Lead-Time(Day)"]:
+        if c in tt_base.columns:
+            tt_base[c] = _as_num(tt_base[c]).fillna(0)
 
-    # ---- Export：Truck(Direction=Export) 连接 Origin Terminal ----
-    truck_exp = df_truck_long[df_truck_long["Direction"] == "Export"].copy()
-    exp = rail.merge(truck_exp, left_on="Origin Terminal", right_on="Terminal", how="left")
-    exp_cost = pd.to_numeric(exp["Rail_Cost"], errors="coerce").fillna(0.0) + \
-               pd.to_numeric(exp["Truck_Cost"], errors="coerce").fillna(0.0)
-    exp_buf  = pd.to_numeric(exp["Rail_Buffer"], errors="coerce").fillna(0.0) + \
-               pd.to_numeric(exp["Truck_Buffer"], errors="coerce").fillna(0.0)
-    exp_out = pd.DataFrame({
-        "City": exp["City"],
-        "Origin Terminal": exp["Origin Terminal"],
-        "Dest Terminal": exp["Dest Terminal"],
-        "Route": exp["Route"],
-        "Direction": "Export",
-        "Cost": exp_cost.round(2),
-        "Buffer": exp_buf.round(2),
+    # T-T 成本（按你的口径：Buffer + cost(包含leasing)）
+    tt_base["TT_total"] = tt_base["Buffer"].fillna(0) + tt_base["cost"].fillna(0)
+    # T-T 时效 = 纯火车段时效
+    tt_base["TT_leadtime"] = tt_base["Lead-Time(Day)"].fillna(0)
+
+    # 组装 T-T 记录（City/Province 置空）
+    tt_final = pd.DataFrame({
+        "Flow": tt_base["Flow"],
+        "Pickup/Delivery City": "",
+        "Province": "",
+        "Origin Terminal": tt_base["Origin Terminal"],
+        "Dest Terminal": tt_base["Dest Terminal"],
+        "Route": tt_base["Route"],
+        "Service Scope": "T-T",
+        "Lead-Time(Day)": tt_base["TT_leadtime"],
+        "valid from": tt_base["valid from"] if "valid from" in tt_base.columns else "",
+        "valid to": tt_base["valid to"] if "valid to" in tt_base.columns else "",
+        "Total Cost": tt_base["TT_total"]
     })
-    exp_out["Total"] = (exp_out["Cost"] + exp_out["Buffer"]).round(2)
 
-    # ---- Import：Truck(Direction=Import) 连接 Dest Terminal ----
-    truck_imp = df_truck_long[df_truck_long["Direction"] == "Import"].copy()
-    imp = rail.merge(truck_imp, left_on="Dest Terminal", right_on="Terminal", how="left")
-    imp_cost = pd.to_numeric(imp["Rail_Cost"], errors="coerce").fillna(0.0) + \
-               pd.to_numeric(imp["Truck_Cost"], errors="coerce").fillna(0.0)
-    imp_buf  = pd.to_numeric(imp["Rail_Buffer"], errors="coerce").fillna(0.0) + \
-               pd.to_numeric(imp["Truck_Buffer"], errors="coerce").fillna(0.0)
-    imp_out = pd.DataFrame({
-        "City": imp["City"],
-        "Origin Terminal": imp["Origin Terminal"],
-        "Dest Terminal": imp["Dest Terminal"],
-        "Route": imp["Route"],
-        "Direction": "Import",
-        "Cost": imp_cost.round(2),
-        "Buffer": imp_buf.round(2),
-    })
-    imp_out["Total"] = (imp_out["Cost"] + imp_out["Buffer"]).round(2)
+    def pick_col(df, candidates, default_val=""):
+        for c in candidates:
+            if c in df.columns:
+                return df[c]
+        return pd.Series([default_val] * len(df), index=df.index)
 
-    total = pd.concat([exp_out, imp_out], ignore_index=True)
+    # ---------- 2) D-T（出口，W）：城市→始发站 的拖车 + T-T ----------
+    truck_w = df_truck[df_truck["Route"].astype(str).str.upper().str.strip() == "W"].copy()
+    tt_w    = tt_base[tt_base["Flow"].astype(str).str.upper().str.strip() == "W"].copy()
 
-    # 清洗及排序
-    total = total.dropna(subset=["City","Origin Terminal","Dest Terminal"])
-    total = total.drop_duplicates()
-    total = total[["City","Origin Terminal","Dest Terminal","Route","Direction","Cost","Buffer","Total"]]
-    return total
-
-
-# ===== 实际调用（在你已有的 df_train / df_truck / df_buffer 准备好之后执行） =====
-if ('df_train' in locals()) and ('df_truck' in locals()) and ('df_buffer' in locals()):
-    truck_long = normalize_truck(df_truck)
-    rail_norm  = normalize_rail(df_train, use_leasing=True)  # 若不想把 leasing 算进 Cost，改为 False
-    buf_norm   = normalize_buffer(df_buffer)
-
-    total_df = build_total(truck_long, rail_norm, buf_norm)
-
-    st.markdown("### ✅ 合并完成 · Total Cost")
-    st.dataframe(total_df, use_container_width=True)
-
-    # 可选：导出
-    @st.cache_data
-    def _to_csv(df):
-        return df.to_csv(index=False).encode("utf-8-sig")
-
-    st.download_button(
-        "下载 Total Cost CSV",
-        data=_to_csv(total_df),
-        file_name="Total_Cost.csv",
-        mime="text/csv",
+    dt_merge = tt_w.merge(
+        truck_w,
+        on="Origin Terminal",
+        how="left",
+        suffixes=("", "_truck")
     )
+
+    # 兼容不同列名（是否带 _truck 后缀）
+    dt_merge["truck_cost"] = pd.to_numeric(pick_col(dt_merge, ["Cost_truck", "Cost"], 0), errors="coerce").fillna(0)
+    dt_merge["truck_lt"]   = pd.to_numeric(pick_col(dt_merge, ["Lead-Time (Day)_truck", "Lead-Time (Day)"], 0), errors="coerce").fillna(0)
+
+    # 重庆任一端 → 拖车费用与时效清零
+    orig_series = pick_col(dt_merge, ["Origin Terminal"])  # 这里一定存在
+    dest_series = pick_col(dt_merge, ["Dest Terminal"])    # 这里一定存在
+    #is_cq_any = orig_series.apply(_is_cq) | dest_series.apply(_is_cq)
+    is_cq_any = _is_cq_bool_series(orig_series) | _is_cq_bool_series(dest_series)
+    dt_merge.loc[is_cq_any, ["truck_cost", "truck_lt"]] = 0
+
+    dt_merge["DT_total"]    = dt_merge["TT_total"] + dt_merge["truck_cost"]
+    dt_merge["DT_leadtime"] = dt_merge["TT_leadtime"] + dt_merge["truck_lt"]
+
+    dt_final = pd.DataFrame({
+        "Flow": dt_merge["Flow"],
+        "Pickup/Delivery City": pick_col(dt_merge, ["Pickup/Delivery City", "Pickup/Delivery City_truck"]),
+        "Province": pick_col(dt_merge, ["Province", "Province_truck"]),
+        "Origin Terminal": dt_merge["Origin Terminal"],
+        "Dest Terminal": dt_merge["Dest Terminal"],
+        "Route": dt_merge["Route"],
+        "Service Scope": "D-T",
+        "Lead-Time(Day)": dt_merge["DT_leadtime"],
+        "valid from": pick_col(dt_merge, ["valid from"], ""),
+        "valid to": pick_col(dt_merge, ["valid to"], ""),
+        "Total Cost": dt_merge["DT_total"],
+    })
+
+    # ---------- 3) T-D（进口，E）：到达站→城市 的拖车 + T-T ----------
+    truck_e = df_truck[df_truck["Route"].astype(str).str.upper().str.strip() == "E"].copy()
+    tt_e    = tt_base[tt_base["Flow"].astype(str).str.upper().str.strip() == "E"].copy()
+
+    td_merge = tt_e.merge(
+        truck_e,
+        left_on="Dest Terminal",
+        right_on="Origin Terminal",
+        how="left",
+        suffixes=("", "_truck")
+    )
+
+    td_merge["truck_cost"] = pd.to_numeric(pick_col(td_merge, ["Cost_truck", "Cost"], 0), errors="coerce").fillna(0)
+    td_merge["truck_lt"]   = pd.to_numeric(pick_col(td_merge, ["Lead-Time (Day)_truck", "Lead-Time (Day)"], 0), errors="coerce").fillna(0)
+
+    # 注意：合并后左表的火车“始发站”在 'Origin Terminal'，
+    # 右表卡车的“起点站”（等于火车的到达站）在 'Origin Terminal_truck'
+    orig_series_td = pick_col(td_merge, ["Origin Terminal"])      # 火车始发站（左）
+    dest_series_td = pick_col(td_merge, ["Dest Terminal"])        # 火车到达站（左）
+    #is_cq_any_td = orig_series_td.apply(_is_cq) | dest_series_td.apply(_is_cq)
+    is_cq_any_td = _is_cq_bool_series(orig_series_td) | _is_cq_bool_series(dest_series_td)
+    td_merge.loc[is_cq_any_td, ["truck_cost", "truck_lt"]] = 0
+
+    td_merge["TD_total"]    = td_merge["TT_total"] + td_merge["truck_cost"]
+    td_merge["TD_leadtime"] = td_merge["TT_leadtime"] + td_merge["truck_lt"]
+
+    td_final = pd.DataFrame({
+        "Flow": td_merge["Flow"],
+        "Pickup/Delivery City": pick_col(td_merge, ["Pickup/Delivery City", "Pickup/Delivery City_truck"]),
+        "Province": pick_col(td_merge, ["Province", "Province_truck"]),
+        # 取火车“始发站”（左表）
+        "Origin Terminal": pick_col(td_merge, ["Origin Terminal"]),
+        "Dest Terminal": td_merge["Dest Terminal"],
+        "Route": td_merge["Route"],
+        "Service Scope": "T-D",
+        "Lead-Time(Day)": td_merge["TD_leadtime"],
+        "valid from": pick_col(td_merge, ["valid from"], ""),
+        "valid to": pick_col(td_merge, ["valid to"], ""),
+        "Total Cost": td_merge["TD_total"],
+    })
+
+
+    # ---------- 4) 合并三类记录 ----------
+    final_df = pd.concat([tt_final, dt_final, td_final], ignore_index=True)
+
+    # ---------- 5) Handling Fee ----------
+    # E=0, W=200；并且 W 的总价再减 200
+    final_df["Handling Fee"] = np.where(final_df["Flow"].astype(str).str.upper().str.strip() == "W", 200, 0)
+    mask_w = final_df["Flow"].astype(str).str.upper().str.strip() == "W"
+    final_df.loc[mask_w, "Total Cost"] = _as_num(final_df.loc[mask_w, "Total Cost"]) - 200
+
+    # ---------- 6) 列顺序与数值类型 ----------
+    final_df["Lead-Time(Day)"] = _as_num(final_df["Lead-Time(Day)"])
+    final_df["Total Cost"]     = _as_num(final_df["Total Cost"])
+    final_cols = [
+        "Flow", "Pickup/Delivery City", "Province",
+        "Origin Terminal", "Dest Terminal", "Route",
+        "Service Scope", "Lead-Time(Day)", "valid from", "valid to",
+        "Total Cost", "Handling Fee"
+    ]
+    final_df = final_df[[c for c in final_cols if c in final_df.columns]]
+    final_df["Route"] = final_df["Route"].replace({
+        "传统线路": "Public Train",
+        "全程时刻表": "Super Express"
+    })
+    return final_df
+
+# —— 可选：把 final_df 的列映射到 HTML 里期望的字段名
+# 如果你的 final_df 列名已经匹配，就删掉这个 mapping
+COLUMN_MAP = {
+    "Pickup/Delivery City": "Origin City/Terminal",
+    "Province": "Province",
+    "Origin Terminal": "Origin Terminal",
+    "Dest Terminal": "Dest Terminal",
+    "Service Scope": "Service Scope", 
+    "Route": "Route",         
+    "Lead-Time(Day)": "Lead-Time(Day)",
+    "Total Cost": "Total Cost",
+    "Handling Fee": "Handling Fee",
+    "valid from": "Valid From",
+    "valid to": "Valid To"
+}
+
+REQUIRED_COLS = list(COLUMN_MAP.values())
+
+def _prepare_df_for_html(df: pd.DataFrame) -> pd.DataFrame:
+    # 复制一份，避免修改原 df
+    d = df.copy()
+
+    # 如果你的 df 是左边为源列、右边为目标列的映射：
+    # 先确保目标列存在
+    for src, dst in COLUMN_MAP.items():
+        if src in d.columns:
+            if dst != src:
+                d[dst] = d[src]
+        else:
+            # 不存在就补空列，避免前端崩
+            d[dst] = np.nan
+
+    # 只保留前端需要的列，并按顺序排列
+    d = d[REQUIRED_COLS]
+
+    # 数值/缺失值清洗，JSON 里不出现 NaN
+    d = d.replace({np.nan: None})
+    # 保证金额是数值类型（可选）
+    for col in ["Total Cost", "Handling Fee"]:
+        if col in d.columns:
+            d[col] = pd.to_numeric(d[col], errors="coerce").fillna(0).astype(float)
+
+    return d
+
+def inject_df_into_html(df: pd.DataFrame, template_path: str) -> str:
+    html = Path(template_path).read_text(encoding="utf-8")
+
+    # 把示例数据块：const csvData = [...];
+    # 替换为我们生成的 JSON：const csvData = <json>;
+    payload = df.to_dict(orient="records")
+    json_str = json.dumps(payload, ensure_ascii=False)
+
+    pattern = r"const\s+csvData\s*=\s*\[(?:.|\n)*?\];"
+    replacement = f"const csvData = {json_str};"
+    new_html = re.sub(pattern, replacement, html)
+    return new_html
+
+if buffer_file and train_files and truck_file:
+    # —— 生成 final df —— #
+    final_df = build_total_cost_table(df_buffer, df_train, df_truck)
+    mask_tt = final_df["Service Scope"] == "T-T"
+    final_df.loc[mask_tt, "Pickup/Delivery City"] = final_df.loc[mask_tt, "Origin Terminal"]
+    final_df.loc[mask_tt, "Province"] = final_df.loc[mask_tt, "Province"]
+    st.success(f"总表生成完成：{len(final_df)} 行")
+    with st.expander("预览"):
+        st.dataframe(final_df, use_container_width=True)
+        st.download_button(
+            "📥 下载合并结果 CSV",
+            data=final_df.to_csv(index=False).encode("utf-8"),
+            file_name="RC_Raw_DB.csv",
+            mime="text/csv"
+        )
+    # —— 按钮：导出 HTML —— #
+    st.header("Export Rate Card HTML")
+    if "final_df" in globals():
+        df_ready = _prepare_df_for_html(final_df)
+        html_template_path = "Rate Card.html"  
+        if Path(html_template_path).exists():
+            if st.button("📤 导出 Rate Card HTML"):
+                out_html = inject_df_into_html(df_ready, html_template_path)
+                st.download_button(
+                    label="下载 Rate Card.html",
+                    data=out_html.encode("utf-8"),
+                    file_name="Rate Card.html",
+                    mime="text/html",
+                    use_container_width=True
+                )
+                st.success("已生成并可下载离线可用的 HTML。")
+        else:
+            st.error("找不到模板文件 Rate Card.html，请把模板放到程序同目录。")
+    else:
+        st.warning("final_df 尚未生成或未在当前作用域。请先生成 final_df。")
 else:
-    st.info("请先确保 Train Cost、Truck、Buffer 三类数据都已加载。")
+    st.info("请上传完整表格。")
+
+

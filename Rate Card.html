@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rate Card</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a2a6c 0%, #b21f1f 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #0066cc 0%, #0099cc 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            letter-spacing: 1px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .search-section {
+            padding: 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .form-group {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .form-item {
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        .form-item label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+            font-size: 14px;
+        }
+        
+        .form-item input, 
+        .form-item select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+            background: white;
+        }
+        
+        .form-item input:focus, 
+        .form-item select:focus {
+            outline: none;
+            border-color: #0066cc;
+            box-shadow: 0 0 0 3px rgba(0,102,204,0.1);
+        }
+        
+        .search-btn {
+            background: linear-gradient(135deg, #0066cc 0%, #0099cc 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            align-self: flex-end;
+            box-shadow: 0 4px 6px rgba(0,102,204,0.2);
+        }
+        
+        .search-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px rgba(0,102,204,0.3);
+            background: linear-gradient(135deg, #0055aa 0%, #0088bb 100%);
+        }
+        
+        .results-section {
+            padding: 30px;
+            display: none;
+        }
+        
+        .section-title {
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #0066cc;
+            font-size: 1.5em;
+        }
+        
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .results-table th {
+            background: linear-gradient(135deg, #0066cc 0%, #0099cc 100%);
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+        }
+        
+        .results-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #eee;
+            vertical-align: top;
+        }
+        
+        .results-table tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        
+        .results-table tr:hover {
+            background-color: #e3f2fd;
+            transform: scale(1.005);
+            transition: all 0.2s ease;
+        }
+        
+        .total-section {
+            background: linear-gradient(135deg, #0066cc 0%, #0099cc 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 10px;
+            text-align: center;
+            margin-top: 20px;
+            box-shadow: 0 4px 15px rgba(0,102,204,0.2);
+        }
+        
+        .total-amount {
+            font-size: 2.2em;
+            font-weight: bold;
+            margin: 15px 0;
+            letter-spacing: 1px;
+        }
+        
+        .info-message {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-size: 1.1em;
+        }
+        
+        .info-message i {
+            font-size: 3em;
+            margin-bottom: 20px;
+            color: #0066cc;
+        }
+        
+        .notification {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 500;
+        }
+        
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #0066cc;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @media (max-width: 768px) {
+            .form-group {
+                flex-direction: column;
+            }
+            
+            .form-item {
+                min-width: 100%;
+            }
+            
+            .header h1 {
+                font-size: 1.8em;
+            }
+            
+            .results-table th, .results-table td {
+                padding: 10px 8px;
+                font-size: 12px;
+            }
+            
+            .total-amount {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Rate Card</h1>
+            <p>European Railway Freight Pricing System</p>
+        </div>
+        
+        <div class="search-section">
+            <div class="form-group">
+                <div class="form-item">
+                    <label>Origin</label>
+                    <input type="text" id="originInput" placeholder="Please enter origin city or terminal">
+                </div>
+                <div class="form-item">
+                    <label>Destination</label>
+                    <input type="text" id="destinationInput" placeholder="Please enter destination city or terminal">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <div class="form-item">
+                    <label>Service Scope</label>
+                    <select id="serviceScopeSelect">
+                        <option value="">All Scopes</option>
+                        <option value="T-T">T-T</option>
+                        <option value="D-T">D-T</option>
+                        <option value="T-D">T-D</option>
+                    </select>
+                </div>
+                <div class="form-item">
+                    <label>Route</label>
+                    <select id="Route Select">
+                        <option value="">All Route</option>
+                        <option value="all">All</option>
+                        <option value="Public Train">Public Train</option>
+                        <option value="Super Express Train">Super Express Train</option>
+                    </select>
+                </div>
+            </div>
+            <button class="search-btn" onclick="searchProducts()">🔍 Search</button>
+        </div>
+        
+        <div id="notificationArea"></div>
+        
+        <div id="resultsSection" class="results-section">
+            <h2 class="section-title">Search Results</h2>
+            <div id="resultsContent">
+                <!-- Results will be displayed here -->
+            </div>
+        </div>
+        
+        <div id="infoSection" class="info-message">
+            <p>Terms & Conditions</p>
+        </div>
+    </div>
+
+    <script>
+        const csvData = []
+
+        // 城市自动匹配数据
+        const allCities = [
+            "Beijing", "Shanghai", "Guangzhou", "Shenzhen", "Hangzhou", "Nanjing", "Wuhan", "Chengdu", "Chongqing", "Xi'an",
+            "Tianjin", "Suzhou", "Qingdao", "Dalian", "Ningbo", "Xiamen", "Fuzhou", "Jinan", "Zhengzhou", "Changsha",
+            "Harbin", "Shenyang", "Changchun", "Shijiazhuang", "Taiyuan", "Hohhot", "Urumqi", "Xining", "Lanzhou",
+            "Yinchuan", "Nanning", "Haikou", "Sanya", "Kunming", "Guiyang", "Nanchang", "Hefei", "Wuxi", "Changzhou",
+            "Nantong", "Xuzhou", "Yangzhou", "Taizhou", "Huai'an", "Yancheng", "Lianyungang", "Suqian", "Zhenjiang", "Taizhou",
+            "Jiaxing", "Huzhou", "Shaoxing", "Jinhua", "Quzhou", "Zhoushan", "Taizhou", "Lishui", "Wenzhou", "Shantou",
+            "Zhanjiang", "Maoming", "Jiangmen", "Foshan", "Zhaoqing", "Huizhou", "Meizhou", "Shanwei", "Heyuan", "Yangjiang",
+            "Qingyuan", "Dongguan", "Zhongshan", "Zhu Hai", "Shantou", "Chaozhou", "Jieyang", "Yunfu", "Shaoguan", "Meizhou",
+            "Hamburg", "Munich", "Berlin", "Frankfurt", "Paris", "London", "Moscow", "Saint Petersburg", "Warsaw", "Prague"
+        ];
+
+        // 城市自动匹配功能
+        function setupAutoComplete(inputId, dataList) {
+            const input = document.getElementById(inputId);
+            let currentFocus;
+            
+            input.addEventListener("input", function() {
+                let val = this.value;
+                closeAllLists();
+                if (!val) { return false;}
+                currentFocus = -1;
+                
+                const items = document.createElement("div");
+                items.setAttribute("id", this.id + "autocomplete-list");
+                items.setAttribute("class", "autocomplete-items");
+                this.parentNode.appendChild(items);
+                
+                dataList.forEach(city => {
+                    if (city.substr(0, val.length).toUpperCase() === val.toUpperCase()) {
+                        const item = document.createElement("div");
+                        item.innerHTML = "<strong>" + city.substr(0, val.length) + "</strong>";
+                        item.innerHTML += city.substr(val.length);
+                        item.addEventListener("click", function() {
+                            input.value = this.innerHTML.split("<strong>")[0] + this.innerHTML.split("</strong>")[1];
+                            closeAllLists();
+                        });
+                        items.appendChild(item);
+                    }
+                });
+            });
+            
+            input.addEventListener("keydown", function(e) {
+                let x = document.getElementById(this.id + "autocomplete-list");
+                if (x) x = x.getElementsByTagName("div");
+                if (e.keyCode === 40) {
+                    currentFocus++;
+                    addActive(x);
+                } else if (e.keyCode === 38) {
+                    currentFocus--;
+                    addActive(x);
+                } else if (e.keyCode === 13) {
+                    e.preventDefault();
+                    if (currentFocus > -1) {
+                        if (x) x[currentFocus].click();
+                    }
+                }
+            });
+            
+            function addActive(x) {
+                if (!x) return false;
+                removeActive(x);
+                if (currentFocus >= x.length) currentFocus = 0;
+                if (currentFocus < 0) currentFocus = (x.length - 1);
+                x[currentFocus].classList.add("autocomplete-active");
+            }
+            
+            function removeActive(x) {
+                for (let i = 0; i < x.length; i++) {
+                    x[i].classList.remove("autocomplete-active");
+                }
+            }
+            
+            function closeAllLists(elmnt) {
+                const x = document.getElementsByClassName("autocomplete-items");
+                for (let i = 0; i < x.length; i++) {
+                    if (elmnt !== x[i] && elmnt !== input) {
+                        x[i].parentNode.removeChild(x[i]);
+                    }
+                }
+            }
+            
+            document.addEventListener("click", function (e) {
+                closeAllLists(e.target);
+            });
+        }
+
+        // 初始化自动匹配
+        window.addEventListener('load', function() {
+            setupAutoComplete('originInput', allCities);
+            setupAutoComplete('destinationInput', allCities);
+        });
+
+        function showNotification(message, type = 'success') {
+            const notificationArea = document.getElementById('notificationArea');
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            notificationArea.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+
+        function searchProducts() {
+            const origin = document.getElementById('originInput').value.trim();
+            const destination = document.getElementById('destinationInput').value.trim();
+            const serviceScope = document.getElementById('serviceScopeSelect').value;
+            const productCategory = document.getElementById('Route Select').value;
+            
+            if (!origin && !destination) {
+                showNotification('Please enter origin city or terminal!', 'warning');
+                return;
+            }
+            
+            // 显示加载状态
+            document.getElementById('infoSection').style.display = 'none';
+            document.getElementById('resultsSection').style.display = 'block';
+            
+            // 模拟加载
+            document.getElementById('resultsContent').innerHTML = `
+                <div class="loading">
+                    <div class="loading-spinner"></div>
+                    <p>Loading results...</p>
+                </div>
+            `;
+            
+            // 模拟延迟
+            setTimeout(() => {
+                // 过滤数据
+                let filteredData = csvData;
+                
+                if (origin) {
+                    filteredData = filteredData.filter(item => 
+                        item["Origin City/Terminal"].toLowerCase().includes(origin.toLowerCase())
+                    );
+                }
+                
+                if (destination) {
+                    filteredData = filteredData.filter(item => 
+                        item["Dest Terminal"].toLowerCase().includes(destination.toLowerCase())
+                    );
+                }
+                
+                if (serviceScope && serviceScope !== "") {
+                    filteredData = filteredData.filter(item => 
+                        item["Service Scope"] === serviceScope
+                    );
+                }
+                
+                if (productCategory && productCategory !== "" && productCategory !== "all") {
+                    filteredData = filteredData.filter(item => 
+                        item["Route"] === productCategory
+                    );
+                }
+                
+                if (filteredData.length === 0) {
+                    document.getElementById('resultsContent').innerHTML = `
+                        <div class="info-message">
+                            <p>No records found matching your criteria</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // 生成表格HTML
+                let tableHTML = `
+                    <table class="results-table">
+                        <thead>
+                            <tr>
+                                <th>Origin City/Terminal</th>
+                                <th>Province</th>
+                                <th>Origin Terminal</th>
+                                <th>Dest Terminal</th>
+                                <th>Service Scope</th>
+                                <th>Route</th>
+                                <th>Lead-Time(Day)</th>
+                                <th>Total Cost</th>
+                                <th>Handling Fee</th>
+                                <th>Valid From</th>
+                                <th>Valid To</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+                
+                let totalCost = 0;
+                let totalFee = 0;
+                
+                filteredData.forEach(item => {
+                    totalCost += item["Total Cost"];
+                    totalFee += item["Handling Fee"];
+                    tableHTML += `
+                        <tr>
+                            <td>${item['Origin City/Terminal']}</td>
+                            <td>${item['Province']}</td>
+                            <td>${item['Origin Terminal']}</td>
+                            <td>${item['Dest Terminal']}</td>
+                            <td>${item['Service Scope']}</td>
+                            <td>${item['Route']}</td>
+                            <td>${item['Lead-Time(Day)']}</td>
+                            <td>$${item['Total Cost'].toLocaleString()}</td>
+                            <td>$${item['Handling Fee'].toLocaleString()}</td>
+                            <td>${item['Valid From']}</td>
+                            <td>${item['Valid To']}</td>
+                        </tr>
+                    `;
+                });
+                
+                document.getElementById('resultsContent').innerHTML = tableHTML;
+                showNotification(`Found ${filteredData.length} records`, 'success');
+            }, 1000);
+        }
+        
+        // 页面加载时的初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 可以在这里添加初始化代码
+        });
+    </script>
+</body>
+</html>
