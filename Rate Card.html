@@ -16,15 +16,17 @@
             background: linear-gradient(135deg, #1a2a6c 0%, #b21f1f 100%);
             min-height: 100vh;
             padding: 20px;
+            overflow-x: auto;
         }
         
         .container {
-            max-width: 1400px;
+            max-width: 100vw;
             margin: 0 auto;
             background: white;
             border-radius: 15px;
             box-shadow: 0 20px 40px rgba(0,0,0,0.3);
             overflow: hidden;
+            min-width: 1400px;
         }
         
         .header {
@@ -60,7 +62,8 @@
         
         .form-item {
             flex: 1;
-            min-width: 200px;
+            min-width: 250px;
+            position: relative;
         }
         
         .form-item label {
@@ -101,6 +104,7 @@
             transition: all 0.3s ease;
             align-self: flex-end;
             box-shadow: 0 4px 6px rgba(0,102,204,0.2);
+            margin-top: 20px;
         }
         
         .search-btn:hover {
@@ -109,9 +113,17 @@
             background: linear-gradient(135deg, #0055aa 0%, #0088bb 100%);
         }
         
+        .search-btn:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
         .results-section {
             padding: 30px;
             display: none;
+            overflow-x: auto;
         }
         
         .section-title {
@@ -129,6 +141,7 @@
             box-shadow: 0 2px 15px rgba(0,0,0,0.1);
             border-radius: 8px;
             overflow: hidden;
+            min-width: 1800px;
         }
         
         .results-table th {
@@ -139,6 +152,7 @@
             font-weight: 600;
             position: sticky;
             top: 0;
+            z-index: 10;
         }
         
         .results-table td {
@@ -157,21 +171,15 @@
             transition: all 0.2s ease;
         }
         
-        .total-section {
-            background: linear-gradient(135deg, #0066cc 0%, #0099cc 100%);
-            color: white;
-            padding: 25px;
+        .results-info {
+            background: #e3f2fd;
+            color: #0066cc;
+            padding: 15px;
             border-radius: 10px;
             text-align: center;
             margin-top: 20px;
-            box-shadow: 0 4px 15px rgba(0,102,204,0.2);
-        }
-        
-        .total-amount {
-            font-size: 2.2em;
-            font-weight: bold;
-            margin: 15px 0;
-            letter-spacing: 1px;
+            font-weight: 600;
+            font-size: 1.1em;
         }
         
         .info-message {
@@ -227,6 +235,83 @@
             100% { transform: rotate(360deg); }
         }
         
+        /* 自动匹配框 */
+        .autocomplete-container {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 2px solid #ddd;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+        }
+        
+        .autocomplete-container.show {
+            display: block;
+        }
+        
+        .autocomplete-item {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+            transition: background-color 0.2s;
+        }
+        
+        .autocomplete-item:hover {
+            background-color: #e3f2fd;
+        }
+        
+        .autocomplete-item:last-child {
+            border-bottom: none;
+        }
+        
+        /* 高亮样式 */
+        .highlight {
+            background-color: #ffeb3b;
+            font-weight: bold;
+        }
+        
+        /* 条款复选框样式 */
+        .terms-container {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+        
+        .terms-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .terms-checkbox input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+        }
+        
+        .terms-label {
+            font-size: 14px;
+            color: #333;
+        }
+        
+        .terms-link {
+            color: #0066cc;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        
+        .terms-link:hover {
+            text-decoration: underline;
+        }
+        
         @media (max-width: 768px) {
             .form-group {
                 flex-direction: column;
@@ -244,10 +329,6 @@
                 padding: 10px 8px;
                 font-size: 12px;
             }
-            
-            .total-amount {
-                font-size: 1.8em;
-            }
         }
     </style>
 </head>
@@ -261,12 +342,14 @@
         <div class="search-section">
             <div class="form-group">
                 <div class="form-item">
-                    <label>Origin</label>
-                    <input type="text" id="originInput" placeholder="Please enter origin city or terminal">
+                    <label>From</label>
+                    <input type="text" id="originInput" placeholder="Enter pickup city">
+                    <div id="originAutocomplete" class="autocomplete-container"></div>
                 </div>
                 <div class="form-item">
-                    <label>Destination</label>
-                    <input type="text" id="destinationInput" placeholder="Please enter destination city or terminal">
+                    <label>To</label>
+                    <input type="text" id="destinationInput" placeholder="Enter delivery city">
+                    <div id="destinationAutocomplete" class="autocomplete-container"></div>
                 </div>
             </div>
             
@@ -282,15 +365,28 @@
                 </div>
                 <div class="form-item">
                     <label>Route</label>
-                    <select id="Route Select">
-                        <option value="">All Route</option>
+                    <select id="routeSelect">
+                        <option value="">All Routes</option>
                         <option value="all">All</option>
                         <option value="Public Train">Public Train</option>
                         <option value="Super Express Train">Super Express Train</option>
                     </select>
                 </div>
             </div>
-            <button class="search-btn" onclick="searchProducts()">🔍 Search</button>
+            
+            <div class="terms-container">
+                <div class="terms-checkbox">
+                    <input type="checkbox" id="termsCheckbox">
+                    <label for="termsCheckbox" class="terms-label">
+                        I have read and agree to the <a href="#" class="terms-link" id="termsLink">Terms & Conditions</a>
+                    </label>
+                </div>
+                <div class="terms-label" style="margin-top: 8px; font-size: 12px; color: #666;">
+                    Check to acknowledge that you have read the terms
+                </div>
+            </div>
+            
+            <button class="search-btn" id="searchButton" onclick="searchProducts()" disabled>🔍 Search</button>
         </div>
         
         <div id="notificationArea"></div>
@@ -303,105 +399,258 @@
         </div>
         
         <div id="infoSection" class="info-message">
-            <p>Terms & Conditions</p>
+            <p>© 2024 European Railway Freight Pricing System. All rights reserved.</p>
         </div>
     </div>
 
     <script>
-        const csvData = []
-
-        // 城市自动匹配数据
-        const allCities = [
-            "Beijing", "Shanghai", "Guangzhou", "Shenzhen", "Hangzhou", "Nanjing", "Wuhan", "Chengdu", "Chongqing", "Xi'an",
-            "Tianjin", "Suzhou", "Qingdao", "Dalian", "Ningbo", "Xiamen", "Fuzhou", "Jinan", "Zhengzhou", "Changsha",
-            "Harbin", "Shenyang", "Changchun", "Shijiazhuang", "Taiyuan", "Hohhot", "Urumqi", "Xining", "Lanzhou",
-            "Yinchuan", "Nanning", "Haikou", "Sanya", "Kunming", "Guiyang", "Nanchang", "Hefei", "Wuxi", "Changzhou",
-            "Nantong", "Xuzhou", "Yangzhou", "Taizhou", "Huai'an", "Yancheng", "Lianyungang", "Suqian", "Zhenjiang", "Taizhou",
-            "Jiaxing", "Huzhou", "Shaoxing", "Jinhua", "Quzhou", "Zhoushan", "Taizhou", "Lishui", "Wenzhou", "Shantou",
-            "Zhanjiang", "Maoming", "Jiangmen", "Foshan", "Zhaoqing", "Huizhou", "Meizhou", "Shanwei", "Heyuan", "Yangjiang",
-            "Qingyuan", "Dongguan", "Zhongshan", "Zhu Hai", "Shantou", "Chaozhou", "Jieyang", "Yunfu", "Shaoguan", "Meizhou",
-            "Hamburg", "Munich", "Berlin", "Frankfurt", "Paris", "London", "Moscow", "Saint Petersburg", "Warsaw", "Prague"
+        // 模拟CSV数据
+        const csvData = [
+            {
+                "From": "Beijing",
+                "Province": "Beijing",
+                "Origin Terminal": "Beijing West Station",
+                "Dest Terminal": "Hamburg Port",
+                "Delivery City": "Hamburg",
+                "Service Scope": "T-T",
+                "Route": "Public Train",
+                "Lead-Time(Day)": "7",
+                "Total Cost": 12000,
+                "Handling Fee": 500,
+                "Extra Cost of Overload": 200,
+                "Service Description": "Standard rail freight service with terminal handling",
+                "Remark": "Subject to weather conditions",
+                "Valid From": "2024-01-01",
+                "Valid To": "2024-12-31"
+            },
+            {
+                "From": "Shanghai",
+                "Province": "Shanghai",
+                "Origin Terminal": "Shanghai Port",
+                "Dest Terminal": "Munich Airport",
+                "Delivery City": "Munich",
+                "Service Scope": "D-T",
+                "Route": "Super Express Train",
+                "Lead-Time(Day)": "10",
+                "Total Cost": 15000,
+                "Handling Fee": 750,
+                "Extra Cost of Overload": 300,
+                "Service Description": "Express rail service with door-to-terminal delivery",
+                "Remark": "Additional charges for weekend delivery",
+                "Valid From": "2024-01-01",
+                "Valid To": "2024-12-31"
+            },
+            {
+                "From": "Guangzhou",
+                "Province": "Guangdong",
+                "Origin Terminal": "Guangzhou Port",
+                "Dest Terminal": "Berlin Station",
+                "Delivery City": "Berlin",
+                "Service Scope": "T-T",
+                "Route": "Public Train",
+                "Lead-Time(Day)": "8",
+                "Total Cost": 13000,
+                "Handling Fee": 650,
+                "Extra Cost of Overload": 250,
+                "Service Description": "Standard rail freight with port handling included",
+                "Remark": "Insurance not included",
+                "Valid From": "2024-01-01",
+                "Valid To": "2024-12-31"
+            },
+            {
+                "From": "Beihai",
+                "Province": "Guangxi",
+                "Origin Terminal": "Beihai Port",
+                "Dest Terminal": "Hamburg Port",
+                "Delivery City": "Hamburg",
+                "Service Scope": "T-T",
+                "Route": "Public Train",
+                "Lead-Time(Day)": "12",
+                "Total Cost": 14000,
+                "Handling Fee": 700,
+                "Extra Cost of Overload": 280,
+                "Service Description": "Economy rail service with extended transit time",
+                "Remark": "Special handling required for fragile items",
+                "Valid From": "2024-01-01",
+                "Valid To": "2024-12-31"
+            }
         ];
 
+        // 从数据中提取所有城市
+        function getAllCities() {
+            const cities = new Set();
+            
+            // 添加所有出发城市
+            csvData.forEach(item => {
+                cities.add(item["From"]);
+            });
+            
+            // 添加所有目的城市
+            csvData.forEach(item => {
+                cities.add(item["Delivery City"]);
+            });
+            
+            return Array.from(cities).sort();
+        }
+
+        const allCities = getAllCities();
+
+        // 防抖函数
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // 转义HTML字符（防止XSS）
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 高亮显示匹配部分
+        function highlightText(city, val) {
+            if (!val || val.length === 0) {
+                return escapeHtml(city);
+            }
+            
+            const cityLower = city.toLowerCase();
+            const valLower = val.toLowerCase();
+            const start = cityLower.indexOf(valLower);
+            
+            if (start === -1) {
+                return escapeHtml(city);
+            }
+            
+            const before = city.slice(0, start);
+            const mid = city.slice(start, start + val.length);
+            const after = city.slice(start + val.length);
+            
+            return `${escapeHtml(before)}<strong class="highlight">${escapeHtml(mid)}</strong>${escapeHtml(after)}`;
+        }
+
         // 城市自动匹配功能
-        function setupAutoComplete(inputId, dataList) {
+        function setupAutoComplete(inputId, dataList, autocompleteId) {
             const input = document.getElementById(inputId);
-            let currentFocus;
+            const autocompleteDiv = document.getElementById(autocompleteId);
             
-            input.addEventListener("input", function() {
-                let val = this.value;
-                closeAllLists();
-                if (!val) { return false;}
-                currentFocus = -1;
+            // 防抖处理输入事件
+            const debouncedSearch = debounce(function() {
+                let val = input.value.trim();
                 
-                const items = document.createElement("div");
-                items.setAttribute("id", this.id + "autocomplete-list");
-                items.setAttribute("class", "autocomplete-items");
-                this.parentNode.appendChild(items);
+                // 清除之前的自动匹配结果
+                autocompleteDiv.innerHTML = '';
                 
-                dataList.forEach(city => {
-                    if (city.substr(0, val.length).toUpperCase() === val.toUpperCase()) {
+                if (!val) {
+                    autocompleteDiv.classList.remove('show');
+                    return;
+                }
+                
+                // 过滤匹配的城市
+                const filteredCities = dataList.filter(city => 
+                    city.toLowerCase().includes(val.toLowerCase())
+                ).slice(0, 10); // 限制显示数量
+                
+                if (filteredCities.length > 0) {
+                    // 创建匹配项
+                    filteredCities.forEach(city => {
                         const item = document.createElement("div");
-                        item.innerHTML = "<strong>" + city.substr(0, val.length) + "</strong>";
-                        item.innerHTML += city.substr(val.length);
+                        item.className = "autocomplete-item";
+                        // 使用高亮函数渲染
+                        item.innerHTML = highlightText(city, val);
                         item.addEventListener("click", function() {
-                            input.value = this.innerHTML.split("<strong>")[0] + this.innerHTML.split("</strong>")[1];
-                            closeAllLists();
+                            input.value = this.textContent; // 保持原始文本
+                            autocompleteDiv.classList.remove('show');
                         });
-                        items.appendChild(item);
-                    }
-                });
-            });
+                        autocompleteDiv.appendChild(item);
+                    });
+                    autocompleteDiv.classList.add('show');
+                } else {
+                    autocompleteDiv.classList.remove('show');
+                }
+            }, 150); // 150ms防抖
             
+            // 输入事件监听
+            input.addEventListener("input", debouncedSearch);
+            
+            // 键盘导航
             input.addEventListener("keydown", function(e) {
-                let x = document.getElementById(this.id + "autocomplete-list");
-                if (x) x = x.getElementsByTagName("div");
-                if (e.keyCode === 40) {
-                    currentFocus++;
-                    addActive(x);
-                } else if (e.keyCode === 38) {
-                    currentFocus--;
-                    addActive(x);
-                } else if (e.keyCode === 13) {
+                if (!autocompleteDiv.classList.contains('show')) return;
+                
+                const items = autocompleteDiv.getElementsByClassName("autocomplete-item");
+                if (items.length === 0) return;
+                
+                let activeIndex = -1;
+                
+                // 找到当前激活的项目
+                for (let i = 0; i < items.length; i++) {
+                    if (items[i].classList.contains("active")) {
+                        activeIndex = i;
+                        break;
+                    }
+                }
+                
+                if (e.keyCode === 40) { // 下箭头
                     e.preventDefault();
-                    if (currentFocus > -1) {
-                        if (x) x[currentFocus].click();
+                    activeIndex = (activeIndex + 1) % items.length;
+                    setActiveItem(items, activeIndex);
+                } else if (e.keyCode === 38) { // 上箭头
+                    e.preventDefault();
+                    activeIndex = activeIndex - 1 < 0 ? items.length - 1 : activeIndex - 1;
+                    setActiveItem(items, activeIndex);
+                } else if (e.keyCode === 13) { // 回车
+                    e.preventDefault();
+                    if (activeIndex >= 0) {
+                        items[activeIndex].click();
                     }
                 }
             });
             
-            function addActive(x) {
-                if (!x) return false;
-                removeActive(x);
-                if (currentFocus >= x.length) currentFocus = 0;
-                if (currentFocus < 0) currentFocus = (x.length - 1);
-                x[currentFocus].classList.add("autocomplete-active");
-            }
-            
-            function removeActive(x) {
-                for (let i = 0; i < x.length; i++) {
-                    x[i].classList.remove("autocomplete-active");
+            // 设置激活项目
+            function setActiveItem(items, index) {
+                for (let i = 0; i < items.length; i++) {
+                    items[i].classList.remove("active");
+                }
+                if (index >= 0 && index < items.length) {
+                    items[index].classList.add("active");
+                    items[index].scrollIntoView({ block: "nearest" });
                 }
             }
             
-            function closeAllLists(elmnt) {
-                const x = document.getElementsByClassName("autocomplete-items");
-                for (let i = 0; i < x.length; i++) {
-                    if (elmnt !== x[i] && elmnt !== input) {
-                        x[i].parentNode.removeChild(x[i]);
-                    }
-                }
-            }
-            
+            // 点击其他地方隐藏自动匹配
             document.addEventListener("click", function (e) {
-                closeAllLists(e.target);
+                if (e.target !== input && !autocompleteDiv.contains(e.target)) {
+                    autocompleteDiv.classList.remove('show');
+                }
             });
         }
 
-        // 初始化自动匹配
+        // 初始化页面
         window.addEventListener('load', function() {
-            setupAutoComplete('originInput', allCities);
-            setupAutoComplete('destinationInput', allCities);
+            setupAutoComplete('originInput', allCities, 'originAutocomplete');
+            setupAutoComplete('destinationInput', allCities, 'destinationAutocomplete');
+            
+            // 条款复选框事件监听
+            const termsCheckbox = document.getElementById('termsCheckbox');
+            const searchButton = document.getElementById('searchButton');
+            
+            termsCheckbox.addEventListener('change', function() {
+                searchButton.disabled = !this.checked;
+            });
+            
+            // 条款链接点击事件
+            document.getElementById('termsLink').addEventListener('click', function(e) {
+                e.preventDefault();
+                // 这里可以链接到后端提供的条款页面
+                alert('Terms & Conditions content will be provided by the backend system.');
+            });
         });
 
         function showNotification(message, type = 'success') {
@@ -417,13 +666,20 @@
         }
 
         function searchProducts() {
+            // 检查条款是否已接受
+            if (!document.getElementById('termsCheckbox').checked) {
+                showNotification('Please accept the Terms & Conditions to search', 'warning');
+                return;
+            }
+            
             const origin = document.getElementById('originInput').value.trim();
             const destination = document.getElementById('destinationInput').value.trim();
+            
             const serviceScope = document.getElementById('serviceScopeSelect').value;
-            const productCategory = document.getElementById('Route Select').value;
+            const route = document.getElementById('routeSelect').value;
             
             if (!origin && !destination) {
-                showNotification('Please enter origin city or terminal!', 'warning');
+                showNotification('Please enter origin city or destination city!', 'warning');
                 return;
             }
             
@@ -441,18 +697,19 @@
             
             // 模拟延迟
             setTimeout(() => {
-                // 过滤数据
+                // 过滤数据 - 严格匹配（仅匹配，不包含）
                 let filteredData = csvData;
                 
                 if (origin) {
                     filteredData = filteredData.filter(item => 
-                        item["Origin City/Terminal"].toLowerCase().includes(origin.toLowerCase())
+                        item["From"].toLowerCase() === origin.toLowerCase()
                     );
                 }
                 
                 if (destination) {
                     filteredData = filteredData.filter(item => 
-                        item["Dest Terminal"].toLowerCase().includes(destination.toLowerCase())
+                        item["Delivery City"].toLowerCase() === destination.toLowerCase() ||
+                        item["Dest Terminal"].toLowerCase() === destination.toLowerCase()
                     );
                 }
                 
@@ -462,35 +719,43 @@
                     );
                 }
                 
-                if (productCategory && productCategory !== "" && productCategory !== "all") {
+                if (route && route !== "" && route !== "all") {
                     filteredData = filteredData.filter(item => 
-                        item["Route"] === productCategory
+                        item["Route"] === route
                     );
                 }
                 
                 if (filteredData.length === 0) {
                     document.getElementById('resultsContent').innerHTML = `
                         <div class="info-message">
-                            <p>No records found matching your criteria</p>
+                            <p>No records found matching your exact criteria</p>
                         </div>
                     `;
+                    showNotification('No records found', 'warning');
                     return;
                 }
                 
-                // 生成表格HTML
+                // 获取第一个结果的Remark作为合并后的Remark
+                const mergedRemark = filteredData.length > 0 ? filteredData[0]['Remark'] : '';
+                
+                // 生成表格HTML - 添加新列
                 let tableHTML = `
                     <table class="results-table">
                         <thead>
                             <tr>
-                                <th>Origin City/Terminal</th>
+                                <th>Pick up City</th>
                                 <th>Province</th>
                                 <th>Origin Terminal</th>
                                 <th>Dest Terminal</th>
+                                <th>Delivery City</th>
                                 <th>Service Scope</th>
                                 <th>Route</th>
                                 <th>Lead-Time(Day)</th>
                                 <th>Total Cost</th>
                                 <th>Handling Fee</th>
+                                <th>Extra Cost of Overload</th>
+                                <th>Service Description</th>
+                                <th>Remark</th>
                                 <th>Valid From</th>
                                 <th>Valid To</th>
                             </tr>
@@ -498,38 +763,40 @@
                         <tbody>
                 `;
                 
-                let totalCost = 0;
-                let totalFee = 0;
-                
                 filteredData.forEach(item => {
-                    totalCost += item["Total Cost"];
-                    totalFee += item["Handling Fee"];
                     tableHTML += `
                         <tr>
-                            <td>${item['Origin City/Terminal']}</td>
+                            <td>${item['From']}</td>
                             <td>${item['Province']}</td>
                             <td>${item['Origin Terminal']}</td>
                             <td>${item['Dest Terminal']}</td>
+                            <td>${item['Delivery City']}</td>
                             <td>${item['Service Scope']}</td>
                             <td>${item['Route']}</td>
                             <td>${item['Lead-Time(Day)']}</td>
                             <td>$${item['Total Cost'].toLocaleString()}</td>
                             <td>$${item['Handling Fee'].toLocaleString()}</td>
+                            <td>$${item['Extra Cost of Overload'].toLocaleString()}</td>
+                            <td>${item['Service Description']}</td>
+                            <td>${mergedRemark}</td>
                             <td>${item['Valid From']}</td>
                             <td>${item['Valid To']}</td>
                         </tr>
                     `;
                 });
                 
+                tableHTML += `
+                        </tbody>
+                    </table>
+                    <div class="results-info">
+                        Found ${filteredData.length} records
+                    </div>
+                `;
+                
                 document.getElementById('resultsContent').innerHTML = tableHTML;
-                showNotification(`Found ${filteredData.length} records`, 'success');
-            }, 1000);
+                showNotification(`Found ${filteredData.length} exact matches`, 'success');
+            }, 800);
         }
-        
-        // 页面加载时的初始化
-        document.addEventListener('DOMContentLoaded', function() {
-            // 可以在这里添加初始化代码
-        });
     </script>
 </body>
 </html>

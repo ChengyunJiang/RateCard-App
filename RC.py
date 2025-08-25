@@ -556,74 +556,74 @@ with tab2:
             "3. Overload cost in case cargo weight more than 23 ton, please check with us case by case.\n"
             "4. Due to impact of Chinese New Year, if your pre/on carriage happen in week 4 to week 7, trucking fee will increase 30%."
         ),
+        "termsncon": ("")
     }
     for k, v in defaults.items():
         st.session_state.setdefault(k, v)
 
-    st.number_input("40' Payload Limited (ton)", min_value=0.0, step=0.5, key="payload40")
-    st.number_input("20' Payload Limited (ton)", min_value=0.0, step=0.5, key="payload20")
+    st.number_input("40' Payload Limited (ton)", min_value=0, step=1, key="payload40")
+    st.number_input("20' Payload Limited (ton)", min_value=0, step=1, key="payload20")
     st.text_input("Extra cost of overload", key="overload_text")
     st.text_input("Service Description", key="service_desc")
-    st.text_area("Remark（整表统一，可编辑）", height=160, key="remark_text")
+    st.text_area("Remark", height=160, key="remark_text")
 
-    # —— 可选：把 final_df 的列映射到 HTML 里期望的字段名
-    # 如果你的 final_df 列名已经匹配，就删掉这个 mapping
-    COLUMN_MAP = {
-        "Pickup/Delivery City": "Origin City/Terminal",
-        "Province": "Province",
-        "Origin Terminal": "Origin Terminal",
-        "Dest Terminal": "Dest Terminal",
-        "Service Scope": "Service Scope", 
-        "Route": "Route",         
-        "Lead-Time(Day)": "Lead-Time(Day)",
-        "Total Cost": "Total Cost",
-        "Handling Fee": "Handling Fee",
-        "valid from": "Valid From",
-        "valid to": "Valid To"
-    }
+# ---------- Export HTML -------------------------------------------------------------------------
+#---------------------------------------------------------------------------------------------------------------
+# —— 可选：把 final_df 的列映射到 HTML 里期望的字段名
+# 如果你的 final_df 列名已经匹配，就删掉这个 mapping
+COLUMN_MAP = {
+    "Pickup/Delivery City": "Origin City/Terminal",
+    "Province": "Province",
+    "Origin Terminal": "Origin Terminal",
+    "Dest Terminal": "Dest Terminal",
+    "Service Scope": "Service Scope", 
+    "Route": "Route",         
+    "Lead-Time(Day)": "Lead-Time(Day)",
+    "Total Cost": "Total Cost",
+    "Handling Fee": "Handling Fee",
+    "valid from": "Valid From",
+    "valid to": "Valid To"
+}
 
-    REQUIRED_COLS = list(COLUMN_MAP.values())
+REQUIRED_COLS = list(COLUMN_MAP.values())
 
-    def _prepare_df_for_html(df: pd.DataFrame) -> pd.DataFrame:
-        # 复制一份，避免修改原 df
-        d = df.copy()
+def _prepare_df_for_html(df: pd.DataFrame) -> pd.DataFrame:
+    # 复制一份，避免修改原 df
+    d = df.copy()
 
-        # 如果你的 df 是左边为源列、右边为目标列的映射：
-        # 先确保目标列存在
-        for src, dst in COLUMN_MAP.items():
-            if src in d.columns:
-                if dst != src:
-                    d[dst] = d[src]
-            else:
-                # 不存在就补空列，避免前端崩
-                d[dst] = np.nan
+    # 如果你的 df 是左边为源列、右边为目标列的映射：
+    # 先确保目标列存在
+    for src, dst in COLUMN_MAP.items():
+        if src in d.columns:
+            if dst != src:
+                d[dst] = d[src]
+        else:
+            # 不存在就补空列，避免前端崩
+            d[dst] = np.nan
 
-        # 只保留前端需要的列，并按顺序排列
-        d = d[REQUIRED_COLS]
+    # 只保留前端需要的列，并按顺序排列
+    d = d[REQUIRED_COLS]
 
-        # 数值/缺失值清洗，JSON 里不出现 NaN
-        d = d.replace({np.nan: None})
-        # 保证金额是数值类型（可选）
-        for col in ["Total Cost", "Handling Fee"]:
-            if col in d.columns:
-                d[col] = pd.to_numeric(d[col], errors="coerce").fillna(0).astype(float)
+    # 数值/缺失值清洗，JSON 里不出现 NaN
+    d = d.replace({np.nan: None})
+    # 保证金额是数值类型（可选）
+    for col in ["Total Cost", "Handling Fee"]:
+        if col in d.columns:
+            d[col] = pd.to_numeric(d[col], errors="coerce").fillna(0).astype(float)
+    return d
 
-        return d
+def inject_df_into_html(df: pd.DataFrame, template_path: str) -> str:
+    html = Path(template_path).read_text(encoding="utf-8")
 
-    def inject_df_into_html(df: pd.DataFrame, template_path: str) -> str:
-        html = Path(template_path).read_text(encoding="utf-8")
+    # 把示例数据块：const csvData = [...];
+    # 替换为我们生成的 JSON：const csvData = <json>;
+    payload = df.to_dict(orient="records")
+    json_str = json.dumps(payload, ensure_ascii=False)
 
-        # 把示例数据块：const csvData = [...];
-        # 替换为我们生成的 JSON：const csvData = <json>;
-        payload = df.to_dict(orient="records")
-        json_str = json.dumps(payload, ensure_ascii=False)
-
-        pattern = r"const\s+csvData\s*=\s*\[(?:.|\n)*?\];"
-        replacement = f"const csvData = {json_str};"
-        new_html = re.sub(pattern, replacement, html)
-        return new_html
-
-
+    pattern = r"const\s+csvData\s*=\s*\[(?:.|\n)*?\];"
+    replacement = f"const csvData = {json_str};"
+    new_html = re.sub(pattern, replacement, html)
+    return new_html
 
 if buffer_file and train_files and truck_file:
     # —— 生成 final df —— #
