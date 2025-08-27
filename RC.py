@@ -63,9 +63,9 @@ if not st.session_state["hide_intro"]:
 # -------- Sidebar Uploads --------
 with st.sidebar:
     st.header("Upload files")
-    train_files = st.file_uploader("Train Cost|T-T (support multiple files)", type=["xls", "xlsx"], accept_multiple_files=True)
+    train_files = st.file_uploader("Train Cost (support multiple files)", type=["xls", "xlsx"], accept_multiple_files=True)
+    truck_file = st.file_uploader("Truck｜拖车费", type=["xls", "xlsx"])
     buffer_file = st.file_uploader("Buffer", type=["xls", "xlsx"])
-    truck_file = st.file_uploader("Truck|拖车费", type=["xls", "xlsx"])
     # st.markdown("---")
     st.markdown("> 说明：本应用**不保存**任何数据；所有处理都在内存完成。")
 
@@ -77,12 +77,13 @@ STD_COLS = {
     "Dest Terminal": ["dest terminal", "destination terminal", "pod", "目的站", "到达站"],
     "Service Scope": ["service scope", "scope", "服务范围"],
     "Lead-Time(Day)": ["lead-time(day)", "lead time", "transit", "tt", "时效", "天"],
-    "valid from": ["valid from", "起始", "有效期自"],
-    "valid to": ["valid to", "截止", "有效期至"],
-    "remark": ["remark", "remarks", "备注", "说明"],
+    "Container Type": ["Container", "container type", "Container Type"],
+    "Valid From": ["Valid From", "valid from", "起始", "有效期自"],
+    "Valid To": ["Valid To", "截止", "有效期至"],
+    "remark": ["remark", "remarks", "备注", "说明"]
 }
 
-NEED_ORDER = ["Flow", "Origin Terminal","Route","Dest Terminal","Service Scope","Lead-Time(Day)","Container Type", "cost","leasing", "valid from","valid to","remark"]
+NEED_ORDER = ["Flow", "Origin Terminal","Route","Dest Terminal","Service Scope","Lead-Time(Day)","Container Type", "cost", "Valid From","Valid To","remark"]
 
 def pick_first_match(colnames, patterns):
     # 确保列名都是字符串
@@ -120,7 +121,7 @@ def normalize_train_cost(df: pd.DataFrame, source_file: str) -> pd.DataFrame:
     out = pd.DataFrame()
 
     # 1) 固定字段映射
-    for name in ["Flow","Origin Terminal","Route","Dest Terminal","Service Scope","Lead-Time(Day)","valid from","valid to","remark"]:
+    for name in ["Flow","Origin Terminal","Route","Dest Terminal","Service Scope","Lead-Time(Day)","Container Type", "Valid From","Valid To","remark"]:
         pats = STD_COLS.get(name, [name])
         col = pick_first_match(cols, pats)
         out[name] = df[col] if col else np.nan
@@ -160,7 +161,7 @@ def normalize_train_cost(df: pd.DataFrame, source_file: str) -> pd.DataFrame:
         out.loc[out["Container Type"].isin(["", "nan", "None"]), "Container Type"] = np.nan
 
     # 5) 文本列去空格 
-    for c in ["Flow","Origin Terminal","Route","Dest Terminal","Service Scope","valid from","valid to","remark","Container Type"]:
+    for c in ["Flow","Origin Terminal","Route","Dest Terminal","Service Scope","Valid From","Valid To","remark","Container Type"]:
         if c in out.columns:
             out[c] = out[c].astype(str).str.strip()
 
@@ -169,7 +170,7 @@ def normalize_train_cost(df: pd.DataFrame, source_file: str) -> pd.DataFrame:
     if "Container Type" in out.columns and "Container Type" not in ordered:
         ordered.append("Container Type")
     out = out.reindex(columns=ordered)
-
+    # out.drop(columns=["leasing"], inplace=True, errors="ignore")
     out["__source_file__"] = source_file
     return out
 
@@ -183,9 +184,8 @@ def fix_leasing(series):
 def build_total_cost_table(df_buffer, df_train, df_truck,
                            remark_text: str = "",
                            payload40: float = None,
-                           payload20: float = None,
                            overload_text: str = "",
-                           service_desc: str = "") -> pd.DataFrame:
+                           note_text: str = "") -> pd.DataFrame:
     # ---------- 小工具 ----------
     def _norm_cols(df):
         d = df.copy()
@@ -243,8 +243,8 @@ def build_total_cost_table(df_buffer, df_train, df_truck,
         "Route": tt_base["Route"],
         "Service Scope": "T-T",
         "Lead-Time(Day)": tt_base["TT_leadtime"],
-        "valid from": tt_base["valid from"] if "valid from" in tt_base.columns else "",
-        "valid to": tt_base["valid to"] if "valid to" in tt_base.columns else "",
+        "Valid From": tt_base["Valid From"] if "Valid From" in tt_base.columns else "",
+        "Valid To": tt_base["Valid To"] if "Valid To" in tt_base.columns else "",
         "Total Cost": tt_base["TT_total"]
     })
 
@@ -280,8 +280,8 @@ def build_total_cost_table(df_buffer, df_train, df_truck,
         "Route": dt_merge["Route"],
         "Service Scope": "D-T",
         "Lead-Time(Day)": dt_merge["DT_leadtime"],
-        "valid from": pick_col(dt_merge, ["valid from"], ""),
-        "valid to": pick_col(dt_merge, ["valid to"], ""),
+        "Valid From": pick_col(dt_merge, ["Valid From"], ""),
+        "Valid To": pick_col(dt_merge, ["Valid To"], ""),
         "Total Cost": dt_merge["DT_total"],
     })
 
@@ -315,8 +315,8 @@ def build_total_cost_table(df_buffer, df_train, df_truck,
         "Route": td_merge["Route"],
         "Service Scope": "T-D",
         "Lead-Time(Day)": td_merge["TD_leadtime"],
-        "valid from": pick_col(td_merge, ["valid from"], ""),
-        "valid to": pick_col(td_merge, ["valid to"], ""),
+        "Valid From": pick_col(td_merge, ["Valid From"], ""),
+        "Valid To": pick_col(td_merge, ["Valid To"], ""),
         "Total Cost": td_merge["TD_total"],
     })
 
@@ -325,24 +325,9 @@ def build_total_cost_table(df_buffer, df_train, df_truck,
     final_df = pd.concat([tt_final, dt_final, td_final], ignore_index=True)
 
     # ---------- 5) Handling Fee ----------
-    def _norm_route(s):
-        return (s.astype(str)
-            .str.replace(r"[\u2013\u2014\u2212]", "-", regex=True) 
-            .str.upper().str.strip())
-
     mask_w   = final_df["Flow"].astype(str).str.upper().str.strip() == "W"
-    routecol = "Service Scope" 
-    mask_tt  = _norm_route(final_df[routecol]) == "T-T"
-    mask_dt  = _norm_route(final_df[routecol]) == "D-T"
-
-    # 只对 W & T-T 的行减 200；D-T 不减
-    final_df.loc[mask_w & mask_tt, "Total Cost"] = (
-        _as_num(final_df.loc[mask_w & mask_tt, "Total Cost"]) - 200
-    )
-    final_df.loc[mask_w & mask_dt, "Total Cost"] = (
-        _as_num(final_df.loc[mask_w & mask_dt, "Total Cost"]) - 200
-    )
-
+    # 只对 W 的行减 200
+    final_df.loc[final_df["Flow"] == "W", "Total Cost"] -= 200
     final_df["Handling Fee"] = np.where(final_df["Flow"].astype(str).str.upper().str.strip() == "W", 200, 0)
 
     # ---------- 6) 列顺序与数值类型 ----------
@@ -351,6 +336,7 @@ def build_total_cost_table(df_buffer, df_train, df_truck,
     # final_df = final_df[[c for c in final_cols if c in final_df.columns]]
     final_df["Route"] = final_df["Route"].replace({
         "传统线路": "Public Train",
+        "传统路线": "Public Train",
         "全程时刻表": "Super Express"
     })
     def _norm(s: pd.Series) -> pd.Series:
@@ -381,33 +367,19 @@ def build_total_cost_table(df_buffer, df_train, df_truck,
     # ---------- Remark & 全局附加列 ----------
     final_df["Remark"] = remark_text or ""
     final_df["Extra cost of overload"] = overload_text or ""
-    final_df["Service Description"] = service_desc or ""
+    mask_cd_ml = (
+    ((final_df["Origin Terminal"] == "Chengdu") & (final_df["Dest Terminal"] == "Malaszewicze")) |
+    ((final_df["Origin Terminal"] == "Malaszewicze") & (final_df["Dest Terminal"] == "Chengdu")))
+    final_df["Note"] = np.where(mask_cd_ml, note_text, "")
     final_df["40' Payload Limited (ton)"] = payload40 if payload40 is not None else ""
-    final_df["20' Payload Limited (ton)"] = payload20 if payload20 !=0 else ""
-
-    # ---------- Text 条件填充 ----------
-    def _norm_ct(s: str) -> str:
-        if not isinstance(s,str): return ""
-        x = s.strip().lower().replace("’","'")
-        x = x.replace("hc","hq")
-        return x
-
-    # if "container type" in final_df.columns:
-    #     ct_norm = final_df["container type"].astype(str).map(_norm_ct)
-    #     is_40 = ct_norm.str.contains("40", na=False)
-    #     is_20 = ct_norm.str.contains("20", na=False)
-    #     final_df["40' Payload Limited (ton)"] = ""
-    #     final_df["20' Payload Limited (ton)"] = ""
-    #     final_df.loc[is_40,"40' Payload Limited (ton)"] = payload40 if payload40 is not None else ""
-    #     final_df.loc[is_20,"20' Payload Limited (ton)"] = payload20 if payload20 is not None else ""
 
     # ---------- 列顺序 ----------
     ordered_cols = [
         "Flow","Pickup/Delivery City","Province","Origin Terminal","Dest Terminal","Route",
-        "Service Scope","Lead-Time(Day)","valid from","valid to",
+        "Service Scope","Lead-Time(Day)","Valid From","Valid To",
         "Total Cost","Handling Fee",
-        "40' Payload Limited (ton)","20' Payload Limited (ton)","Extra cost of overload",
-        "Service Description","Remark"
+        "40' Payload Limited (ton)","Extra cost of overload",
+        "Note","Remark"
     ]
     final_df = final_df[[c for c in ordered_cols if c in final_df.columns]]
     return final_df
@@ -415,6 +387,7 @@ def build_total_cost_table(df_buffer, df_train, df_truck,
 tab1, tab2 = st.tabs({"Data", "Text"})
 # ---------- Train Data Processing ----------
 with tab1:
+    st.number_input("USD:CNY Rate", min_value=0.0, step=0.01, value=7.0, key="rate")
     if train_files:
         dfs = []
         for f in train_files:
@@ -426,14 +399,26 @@ with tab1:
             norm = normalize_train_cost(df_raw, f.name)
             dfs.append(norm)
         all_train = pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame(columns=NEED_ORDER)
-        df_train = all_train.dropna(how="all")
+        df_train = all_train.dropna(how="all") 
         df_train = df_train.dropna(subset=["cost"])
-        #df_train["leasing"] = fix_leasing(df_train["leasing"])
-        # show combined table
+        # 1) 规范日期列
+        df_train["Valid From"] = pd.to_datetime(df_train["Valid From"], errors="coerce")
+        df_train["Valid To"]   = pd.to_datetime(df_train["Valid To"],   errors="coerce")
+
+        # 2) 仅保留 Valid From 在每月 1 号的价格
+        mask_first = df_train["Valid From"].dt.day == 1
+        df_train = df_train.loc[mask_first].copy()
+
+        # 3) 把 Valid To 设为当月最后一天
+        df_train["Valid To"] = df_train["Valid From"] + pd.offsets.MonthEnd(0)
+
+        df_train["Valid From"] = df_train["Valid From"].dt.date
+        df_train["Valid To"]   = df_train["Valid To"].dt.date
         with st.expander("查看合并后的Train Cost"):
             st.success(f"Train Cost 已加载，合并后 {len(df_train)} 行。")
+            # df_train = st.data_editor(df_train, use_container_width=True)
             st.dataframe(df_train[NEED_ORDER], use_container_width=True)
-
+            
     # ---------- Truck Data Processing ----------
     if truck_file:
         dfs_truck = []
@@ -465,9 +450,10 @@ with tab1:
             all_truck.drop(pro_col, axis=1, inplace=True)  
 
         # 处理 cost 列，找到包含 cost 的列并除以 7
+        usd_cny = float(st.session_state.get("rate", 7.0) or 7.0) 
         cost_col = [col for col in all_truck.columns if 'cost' in col.lower()]
         if cost_col:
-            all_truck['Cost'] = np.round(all_truck[cost_col[0]] / 7).astype(int)
+            all_truck['Cost'] = np.round(all_truck[cost_col[0]] / usd_cny).astype(int)
             all_truck.drop(cost_col[0], axis=1, inplace=True)
         all_truck['Valid From'] = pd.to_datetime(all_truck['Valid From'], errors='coerce').dt.date
         all_truck['Valid To'] = pd.to_datetime(all_truck['Valid To'], errors='coerce').dt.date
@@ -512,13 +498,12 @@ with tab1:
             _norm(df_buffer["Dest Terminal"]).eq("MALASZEWICZE")
             )
         df_buffer.loc[mask_2, ["Route","Dest Terminal"]] = ["全程时刻表","Lodz"]
-        
-        with st.expander("查看Buffer数据", expanded=True):
+        st.session_state.setdefault("buffer_expanded", False)  # 默认不展开
+        with st.expander("查看Buffer数据", expanded=st.session_state["buffer_expanded"]):
             st.success(f"Buffer数据已加载，共{len(df_buffer)} 行。")
             # 首次进入时，把原数据放到会话里，避免编辑时闪回
             if "buffer_edit_df" not in st.session_state:
                 st.session_state["buffer_edit_df"] = df_buffer.copy()
-
             with st.form("buffer_edit_form"):
                 edited = st.data_editor(
                     st.session_state["buffer_edit_df"],
@@ -531,16 +516,11 @@ with tab1:
                                             help="可输入0.05或5%；后台可再统一为小数"),
                         "remark": st.column_config.TextColumn("remark", max_chars=200),
                     },
-                    # 若你只想让某些列可编辑，填 disabled=[...不可编辑列...]
-                    # disabled=[]
                 )
                 saved = st.form_submit_button("保存 Buffer 编辑")
-
-        if saved:
-            st.session_state["buffer_edit_df"] = edited.copy()
-            st.success("已保存 Buffer 编辑内容。")
-
-        # ↓ 后续处理用这个变量（把编辑后的结果作为 df_buffer 往下传）
+            if saved:
+                st.session_state["buffer_edit_df"] = edited.copy()
+                st.success("已保存 Buffer 编辑内容。")
         df_buffer = st.session_state["buffer_edit_df"]
 
 with tab2:
@@ -549,22 +529,19 @@ with tab2:
         "payload40": 20,
         "payload20": 20,
         "overload_text": "250USD/40'/20'(20-23 ton)",
-        "service_desc": "Block train (W&E)",
+        "note_text": "Actual arrival/departure station is Lodz i/o Malaszewicze.",
         "remark_text": (
             "1. WB leadtime include CN terminal customs landing time\n"
             "2. EB leadtime exclude CN terminal customs lead time of estimated 1-2 days\n"
             "3. Overload cost in case cargo weight more than 23 ton, please check with us case by case.\n"
             "4. Due to impact of Chinese New Year, if your pre/on carriage happen in week 4 to week 7, trucking fee will increase 30%."
-        ),
-        "termsncon": ("")
+        )
     }
     for k, v in defaults.items():
         st.session_state.setdefault(k, v)
 
     st.number_input("40' Payload Limited (ton)", min_value=0, step=1, key="payload40")
-    st.number_input("20' Payload Limited (ton)", min_value=0, step=1, key="payload20")
     st.text_input("Extra cost of overload", key="overload_text")
-    st.text_input("Service Description", key="service_desc")
     st.text_area("Remark", height=160, key="remark_text")
 
 # ---------- Export HTML -------------------------------------------------------------------------
@@ -572,41 +549,65 @@ with tab2:
 # —— 可选：把 final_df 的列映射到 HTML 里期望的字段名
 # 如果你的 final_df 列名已经匹配，就删掉这个 mapping
 COLUMN_MAP = {
-    "Pickup/Delivery City": "Origin City/Terminal",
+    "Pickup/Delivery City": "Pickup/Delivery City",  # 改：直接映射到 HTML 需要的键
     "Province": "Province",
     "Origin Terminal": "Origin Terminal",
     "Dest Terminal": "Dest Terminal",
-    "Service Scope": "Service Scope", 
-    "Route": "Route",         
+    "Service Scope": "Service Scope",
+    "Route": "Route",
     "Lead-Time(Day)": "Lead-Time(Day)",
     "Total Cost": "Total Cost",
     "Handling Fee": "Handling Fee",
-    "valid from": "Valid From",
-    "valid to": "Valid To"
+    "Valid From": "Valid From",
+    "Valid To": "Valid To",
+    "Extra cost of overload": "Extra Cost of Overload",      
+    "Note": "Note",                                         
+    "40' Payload Limited (ton)": "40' Payload Limited (ton)" 
 }
+# COLUMN_MAP = {
+#     "Pickup/Delivery City": "Origin City/Terminal",
+#     "Province": "Province",
+#     "Origin Terminal": "Origin Terminal",
+#     "Dest Terminal": "Dest Terminal",
+#     "Service Scope": "Service Scope", 
+#     "Route": "Route",         
+#     "Lead-Time(Day)": "Lead-Time(Day)",
+#     "Total Cost": "Total Cost",
+#     "Handling Fee": "Handling Fee",
+#     "Valid From": "Valid From",
+#     "Valid To": "Valid To"
+# }
+#REQUIRED_COLS = list(COLUMN_MAP.values())
 
-REQUIRED_COLS = list(COLUMN_MAP.values())
+REQUIRED_COLS = [
+    "Pickup/Delivery City",
+    "Origin Terminal",
+    "Dest Terminal",
+    "Province",
+    "Service Scope",
+    "Route",
+    "Lead-Time(Day)",
+    "Total Cost",
+    "Handling Fee",
+    "40' Payload Limited (ton)",
+    "Extra Cost of Overload",
+    "Note",
+    "Remark",
+    "Valid From",
+    "Valid To",
+]
 
 def _prepare_df_for_html(df: pd.DataFrame) -> pd.DataFrame:
-    # 复制一份，避免修改原 df
     d = df.copy()
-
-    # 如果你的 df 是左边为源列、右边为目标列的映射：
-    # 先确保目标列存在
     for src, dst in COLUMN_MAP.items():
         if src in d.columns:
             if dst != src:
                 d[dst] = d[src]
         else:
-            # 不存在就补空列，避免前端崩
             d[dst] = np.nan
-
     # 只保留前端需要的列，并按顺序排列
     d = d[REQUIRED_COLS]
-
-    # 数值/缺失值清洗，JSON 里不出现 NaN
     d = d.replace({np.nan: None})
-    # 保证金额是数值类型（可选）
     for col in ["Total Cost", "Handling Fee"]:
         if col in d.columns:
             d[col] = pd.to_numeric(d[col], errors="coerce").fillna(0).astype(float)
@@ -614,7 +615,8 @@ def _prepare_df_for_html(df: pd.DataFrame) -> pd.DataFrame:
 
 def inject_df_into_html(df: pd.DataFrame, template_path: str) -> str:
     html = Path(template_path).read_text(encoding="utf-8")
-
+    df_ready["Valid From"] = df_ready["Valid From"].astype(str)
+    df_ready["Valid To"] = df_ready["Valid To"].astype(str)
     # 把示例数据块：const csvData = [...];
     # 替换为我们生成的 JSON：const csvData = <json>;
     payload = df.to_dict(orient="records")
@@ -625,20 +627,18 @@ def inject_df_into_html(df: pd.DataFrame, template_path: str) -> str:
     new_html = re.sub(pattern, replacement, html)
     return new_html
 
+
 if buffer_file and train_files and truck_file:
     # —— 生成 final df —— #
-    #final_df = build_total_cost_table(df_buffer, df_train, df_truck)
     final_df = build_total_cost_table(
         df_buffer=df_buffer,
         df_train=df_train,
         df_truck=df_truck,
         remark_text=st.session_state["remark_text"],
         payload40=st.session_state["payload40"],
-        payload20=st.session_state["payload20"],
         overload_text=st.session_state["overload_text"],
-        service_desc=st.session_state["service_desc"],
+        note_text=st.session_state["note_text"],
     )
-
     mask_tt = final_df["Service Scope"] == "T-T"
     final_df.loc[mask_tt, "Pickup/Delivery City"] = final_df.loc[mask_tt, "Origin Terminal"]
     final_df.loc[mask_tt, "Province"] = final_df.loc[mask_tt, "Province"]
@@ -651,8 +651,7 @@ if buffer_file and train_files and truck_file:
             file_name="RC_Raw_DB.csv",
             mime="text/csv"
         )
-    # —— 按钮：导出 HTML —— #
-    st.header("Export Rate Card HTML")
+    st.header("Export Rate Card HTML")    
     if "final_df" in globals():
         df_ready = _prepare_df_for_html(final_df)
         html_template_path = "Rate Card.html"  
@@ -662,7 +661,7 @@ if buffer_file and train_files and truck_file:
                 st.download_button(
                     label="下载 Rate Card.html",
                     data=out_html.encode("utf-8"),
-                    file_name="Rate Card.html",
+                    file_name="827.html",
                     mime="text/html",
                     use_container_width=True
                 )
@@ -673,6 +672,7 @@ if buffer_file and train_files and truck_file:
         st.warning("final_df 尚未生成或未在当前作用域。请先生成 final_df。")
 else:
     st.info("请上传完整表格。")
+
 
 if "final_df" in locals() and isinstance(final_df, pd.DataFrame) and not final_df.empty:
     if not st.session_state["hide_intro"]:
