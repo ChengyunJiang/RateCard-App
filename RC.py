@@ -11,32 +11,16 @@ import json
 import re
 from pathlib import Path
 
-st.markdown("""
-    <style>
-    .refresh-button {
-        position: fixed;
-        top: 10px;
-        right: 10px;
-        z-index: 100;
-    }
-    </style>
-    <div class="refresh-button">
-        <form action="" method="get">
-            <button type="submit"> Refresh</button>
-        </form>
-    </div>
-""", unsafe_allow_html=True)
+# hide_streamlit_style = """
+#     <style>
+#     #MainMenu {visibility: hidden;}
+#     footer {visibility: hidden;}
+#     header {visibility: hidden;}
+#     .css-1dp5vir {display: none;} 
+#     </style>
+# """
 
-hide_streamlit_style = """
-    <style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    .css-1dp5vir {display: none;} 
-    </style>
-"""
-
-st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+# st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 st.set_page_config(layout="wide")
 st.title("📑 Rate Card Generator")
@@ -80,7 +64,7 @@ if not st.session_state["hide_intro"]:
     intro_banner()
 # -------- Sidebar Uploads --------
 with st.sidebar:
-    st.header("Upload files")
+    st.header("👇 Upload files")
     train_files = st.file_uploader("Train Cost (support multiple files)", type=["xls", "xlsx"], accept_multiple_files=True)
     truck_file = st.file_uploader("Truck｜拖车费", type=["xls", "xlsx"])
     buffer_file = st.file_uploader("Buffer", type=["xls", "xlsx"])
@@ -447,7 +431,7 @@ def build_total_cost_table(df_buffer, df_train, df_truck,
 tab1, tab2 = st.tabs(["Data", "Text"])
 # ---------- Train Data Processing ----------
 with tab1:
-    st.number_input("USD:CNY Rate", min_value=0.0, step=0.01, value=7.0, key="rate")
+    st.number_input("💲 USD:CNY Rate", min_value=0.0, step=0.01, value=7.0, key="rate")
     if train_files:
         dfs = []
         for f in train_files:
@@ -474,7 +458,7 @@ with tab1:
 
         df_train["Valid From"] = df_train["Valid From"].dt.date
         df_train["Valid To"]   = df_train["Valid To"].dt.date
-        with st.expander("查看合并后的Train Cost"):
+        with st.expander("🚄 查看合并后的Train Cost"):
             st.success(f"Train Cost 已加载，合并后 {len(df_train)} 行。")
             # df_train = st.data_editor(df_train, use_container_width=True)
             st.dataframe(df_train[NEED_ORDER], use_container_width=True)
@@ -532,7 +516,7 @@ with tab1:
         #df_truck = all_truck[column_order] if all(col in all_truck.columns for col in column_order) else all_truck
         df_truck = all_truck[column_order]
         # 显示合并后的 Truck 数据
-        with st.expander("查看拖车费数据"):
+        with st.expander("🚛 查看拖车费数据"):
             st.success(f"拖车费数据已加载，共{len(df_truck)} 行。")
             st.dataframe(df_truck, use_container_width=True)
 
@@ -559,7 +543,7 @@ with tab1:
             )
         df_buffer.loc[mask_2, ["Route","Dest Terminal"]] = ["全程时刻表","Lodz"]
         st.session_state.setdefault("buffer_expanded", False)  # 默认不展开
-        with st.expander("查看Buffer数据", expanded=st.session_state["buffer_expanded"]):
+        with st.expander("💰 查看Buffer数据", expanded=st.session_state["buffer_expanded"]):
             st.success(f"Buffer数据已加载，共{len(df_buffer)} 行。")
             # 首次进入时，把原数据放到会话里，避免编辑时闪回
             if "buffer_edit_df" not in st.session_state:
@@ -745,7 +729,7 @@ if buffer_file and train_files and truck_file:
 
     st.success(f"总表生成完成：{len(final_df)} 行")
 
-    with st.expander("预览"):
+    with st.expander("🔍 预览"):
         st.dataframe(final_df, use_container_width=True)
         st.download_button(
             "📥 下载合并结果 CSV",
@@ -774,7 +758,7 @@ if buffer_file and train_files and truck_file:
     else:
         st.warning("final_df 尚未生成或未在当前作用域。请先生成 final_df。")
 else:
-    st.info("请上传完整表格。")
+    st.info("请上传完整表格🫰")
 
 
 if "final_df" in locals() and isinstance(final_df, pd.DataFrame) and not final_df.empty:
