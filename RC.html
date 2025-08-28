@@ -56,11 +56,6 @@
             gap: 20px;
         }
         
-        .header-image {
-            width: 300px;
-            height: 300px;
-            object-fit: contain;
-        }
         
         .header-text {
             flex: 1;
@@ -398,10 +393,7 @@
                 text-align: center;
             }
             
-            .header-image {
-                width: 80px;
-                height: 80px;
-            }
+
         }
         
         @media (max-width: 768px) {
@@ -582,7 +574,6 @@
     <div class="container">
       <div class="header">
     <div class="header-content">
-        <img src="image001.png" alt="Left Image" class="header-image">
         <div class="header-text">
             <div class="logo-container">
                 <div class="logo">
@@ -592,7 +583,6 @@
             <h1>Rate Card</h1>
             <p><i class="fas fa-route"></i>European Railway Freight Pricing System</p>
         </div>
-        <img src="image002.png" alt="Right Image" class="header-image">
     </div>
 </div>
         
@@ -624,8 +614,8 @@
                     <label><i class="fas fa-route"></i> Route</label>
                     <select id="routeSelect">
                         <option value="">All Routes</option>
-                        <option value="Public Train">Public Train</option>
-                        <option value="Super Express Train">Super Express Train</option>
+                        <option value="Public">Public</option>
+                        <option value="Super Express">Super Express</option>
                     </select>
                 </div>
             </div>
@@ -672,7 +662,7 @@
         </div>
         
         <div class="footer-note">
-            <p>If there is no route/price you want at this terminal, you can also consult our BD colleagues separately</p>
+            <p>If there is no route you want at this terminal, you can also consult our BD colleagues separately</p>
         </div>
         
         <div id="infoSection" class="info-message">
@@ -791,6 +781,46 @@
    <script>
     // 注入的数据已在这里
     // const csvData = [ ... ];  ← 由 Python 替换注入
+    const csvData = [
+        
+           ];
+
+     // 获取所有城市列表
+        const allCities = [
+            "Ankang", "Anping", "Anqing", "Anqiu", "Anshan", "Anshun", "Anyang", "Baicheng", "Baise", "Baishan", "Baiyin", 
+            "Baoding", "Baoji", "Baoying", "Bazhong", "Beihai", "Beijing", "Bengbu", "Benxi", "Bijie", "Binzhou", "Bozhou", 
+            "Budapest", "Cangzhou", "Changbaishan", "Changchun", "Changde", "Changsha", "Changshu", "Changyi", "Changzhi",
+            "Changzhou", "Chaohu", "Chaoshan", "Chaozhou", "Chengde", "Chengdu", "Chenzhou", "Chizhou", "Chongqing", "Chongzuo",
+            "Chuzhou", "Cixi", "Dachang", "Dafeng", "Dalian", "Dandong", "Danyang", "Datong", "Dazhou", "Deyang", "Dezhou",
+            "Dingxi", "Dongguan", "Dongtai", "Dongyang", "Dongying", "Duisburg", "Ezhou", "Fangchenggang", "Feicheng", "Fenghua",
+            "Foshan", "Fuqing", "Fushun", "Fuxin", "Fuyang(AH)", "Fuyang(ZJ)", "Fuzhou", "Fuzhou(FJ)", "Fuzhou(JX)", "Ganzhou",
+            "Gaomi", "Gaoyou", "Guangan", "Guangyuan", "Guangzhou", "Guigang", "Guilin", "Guiyang", "Haimen", "Haining", "Haiyan",
+            "Haiyang", "Hamburg", "Handan", "Hangzhou", "Hanzhong", "Hebi", "Hechi", "Hefei", "Hengshui", "Hengyang", "Heyuan",
+            "Heze", "Hezhou", "Huaian", "Huaibei", "Huaihua", "Huainan", "Huanggang", "Huanghua", "Huangshan", "Huangshi", "Huangyan",
+            "Huizhou", "Huludao", "Huzhou", "Jian", "Jiande", "Jiangdong", "Jiangmen", "Jiangshan", "Jiangyan", "Jiangyin", "Jiaonan",
+            "Jiaozhou", "Jiaozuo", "Jiaxing", "Jiayuguan", "Jieyang", "Jilin", "Jimo", "Jinan", "Jinchang", "Jincheng", "Jingdezhen",
+            "Jingjiang", "Jingmen ", "Jingzhou", "Jinhua", "Jining", "Jinjiang", "Jintan", "Jinyun", "Jinzhong", "Jinzhou", "Jiujiang",
+            "Jiuquan", "Jiyuan", "Jurong", "Kaifeng", "Kunshan", "Laibin", "Laiwu", "Laixi", "Laiyang", "Laizhou", "Langfang", "Lanxi",
+            "Lanzhou", "Leling", "Leqing", "Leshan", "LiLing", "Lianyungang", "Liaocheng", "Liaoyang", "Liaoyuan", "Linan", "Linfen",
+            "Linhai", "Linqing", "Linyi", "Lisui", "Liupanshui", "Liuzhou", "Liyang", "Longkou", "Longnan", "Longquan", "Longyan",
+            "Loudi", "Luan", "Luohe", "Luoyang", "Lutai", "Luzhou", "Lvliang", "Maanshan", "Madrid", "Malaszewicze", "Maoming", "Meishan",
+            "Meizhou", "Mianyang", "Nanchang", "Nanchong", "Nanjing", "Nanning", "Nanping", "Nantong", "Nanyang", "Neijiang", "Ningbo",
+            "Ningde", "Ninghai", "Panan", "Panjin", "Panzhihua", "Penglai", "Pingdingshan", "Pingdong", "Pinghu", "Pingliang", "Pingxiang",
+            "Pizhou", "Prague", "Putian", "Puyang", "Qidong", "Qingdao", "Qingyang", "Qingyuan", "Qingzhou", "Qinhuangdao", "Qinzhou",
+            "Qixia", "Quanzhou", "Qufu", "Quzhou", "Rizhao", "Rongcheng", "Rugao", "Ruian", "Rushan", "Sanmenxia", "Sanming", "Shanghai",
+            "Shangluo", "Shangqiu", "Shangrao", "Shangyu", "Shantou", "Shanwei", "Shaoguan", "Shaoxing", "Shaoyang", "Shengfang",
+            "Shengzhou", "Shenyang", "Shenzhen", "Shijiazhuang", "Shiyan", "Shouguang", "Shunde", "Shuozhou", "Shuyang", "Siping", "Songyuan",
+            "Suining", "Suizhou", "Suqian", "Suzhou", "Suzhou(AH)", "Suzhou(JS)", "Taian", "Taicang", "Taishan", "Taixing", "Taiyuan",
+            "Taizhou(JS)", "Taizhou(ZJ)", "Tangshan", "Tengzhou", "Tianjin", "Tianmen", "Tianshui", "Tieling", "Tongchuan", "Tonghua",
+            "Tongling", "Tongren", "Tongxiang", "Tongzhou", "Weifang", "Weihai", "Weinan", "Wendeng", "Wenling", "Wenzhou", "Wuhan", "Wuhu",
+            "Wujiang", "Wuwei", "Wuxi", "Wuzhou", "Xi'an", "Xiamen", "Xian", "Xiangfan", "Xiangtan", "Xiangyang", "Xianning", "Xiantao",
+            "Xianyang", "Xiaogan", "Xinghua", "Xingtai", "Xintai", "Xinxiang", "Xinyang", "Xinyi", "Xinyu", "Xinzhou", "Xuanchneg", "Xuchang",
+            "Xuzhou", "Yaan", "Yanan", "Yancheng ", "Yangchun", "Yangjiang", "Yangquan", "Yangzhong", "Yangzhou", "Yantai", "Yanzhou", "Yibin",
+            "Yichang", "Yichun", "Yingkou", "Yingtan", "Yiwu", "Yixing", "Yiyang", "Yizheng", "Yongkang", "Yongzhou", "Yucheng", "Yueyang", "Yulin",
+            "Yuncheng", "Yunfu", "Yuyao", "Zaozhuang", "Zhangjiagang", "Zhangjiajie", "Zhangjiakou", "Zhangqiu", "Zhangye", "Zhangzhou", "Zhanjiang",
+            "Zhaoqing", "Zhaoyang", "Zhaoyuan", "Zhengzhou", "Zhenjiang", "Zhijiang", "Zhongshan", "Zhoukou", "Zhoushan", "Zhucheng", "Zhuhai",
+            "Zhuji", "Zhumadian", "Zhuozhou", "Zhuzhoiu", "Zibo", "Zigong", "Ziyang", "Zoucheng", "Zunyi", "zhuhai"
+        ];
 
     // 条款弹窗功能 - 独立于数据
     function openTab(evt, tabName) {
@@ -820,23 +850,15 @@
         }, 3000);
     }
 
-   // 提取城市函数
+    // 提取城市函数
     function extractCities(data) {
-         const cities = new Set();
+        const cities = new Set();
         data.forEach(item => {
-            // 添加西向的起点和终点
-            if (item["Flow"] === "W") {
-               if (item["Pickup/Delivery City"]) cities.add(item["Pickup/Delivery City"]);
-               if (item["Dest Terminal"]) cities.add(item["Dest Terminal"]);
-        }
-            // 添加东向的起点和终点
-            else if (item["Flow"] === "E") {
-               if (item["Origin Terminal"]) cities.add(item["Origin Terminal"]);
-               if (item["Pickup/Delivery City"]) cities.add(item["Pickup/Delivery City"]);
-        }
-    });
-    return Array.from(cities).sort();
-}
+            if (item["From"]) cities.add(item["From"]);
+            if (item["To"]) cities.add(item["To"]);
+        });
+        return Array.from(cities).sort();
+    }
 
     // 防抖函数
     function debounce(func, wait) {
@@ -879,100 +901,99 @@
         return escapeHtml(city);
     }
 
-    // 城市自动匹配功能（修改为顺序匹配）
-    function setupAutoComplete(inputId, dataList, autocompleteId) {
-        const input = document.getElementById(inputId);
-        const autocompleteDiv = document.getElementById(autocompleteId);
-        
-        // 防抖处理输入事件
-        const debouncedSearch = debounce(function() {
-            let val = input.value.trim();
+    // 城市自动匹配功能
+        function setupAutoComplete(inputId, dataList, autocompleteId) {
+            const input = document.getElementById(inputId);
+            const autocompleteDiv = document.getElementById(autocompleteId);
             
-            // 清除之前的自动匹配结果
-            autocompleteDiv.innerHTML = '';
-            
-            if (!val) {
-                autocompleteDiv.classList.remove('show');
-                return;
-            }
-            
-            // 过滤匹配的城市（顺序匹配）
-            const filteredCities = dataList.filter(city => 
-                city.toLowerCase().startsWith(val.toLowerCase())
-            ).slice(0, 10);
-            
-            if (filteredCities.length > 0) {
-                // 创建匹配项
-                filteredCities.forEach(city => {
-                    const item = document.createElement("div");
-                    item.className = "autocomplete-item";
-                    item.innerHTML = highlightText(city, val);
-                    item.addEventListener("click", function() {
-                        input.value = city;
-                        autocompleteDiv.classList.remove('show');
+            const debouncedSearch = debounce(function() {
+                let val = input.value.trim();
+                
+                // 清除之前的自动匹配结果
+                autocompleteDiv.innerHTML = '';
+                
+                if (!val) {
+                    autocompleteDiv.classList.remove('show');
+                    return;
+                }
+                
+                // 过滤匹配的城市（前缀匹配）
+                const filteredCities = dataList.filter(city => 
+                    city.toLowerCase().startsWith(val.toLowerCase())
+                ).slice(0, 10);
+                
+                if (filteredCities.length > 0) {
+                    // 创建匹配项
+                    filteredCities.forEach(city => {
+                        const item = document.createElement("div");
+                        item.className = "autocomplete-item";
+                        item.innerHTML = highlightText(city, val); // 修复：使用正确的函数名
+                        item.addEventListener("click", function() {
+                            input.value = city;
+                            autocompleteDiv.classList.remove('show');
+                        });
+                        autocompleteDiv.appendChild(item);
                     });
-                    autocompleteDiv.appendChild(item);
-                });
-                autocompleteDiv.classList.add('show');
-            } else {
-                autocompleteDiv.classList.remove('show');
-            }
-        }, 150);
-        
-        // 输入事件监听
-        input.addEventListener("input", debouncedSearch);
-        
-        // 键盘导航
-        input.addEventListener("keydown", function(e) {
-            if (!autocompleteDiv.classList.contains('show')) return;
+                    autocompleteDiv.classList.add('show');
+                } else {
+                    autocompleteDiv.classList.remove('show');
+                }
+            }, 300);
             
-            const items = autocompleteDiv.getElementsByClassName("autocomplete-item");
-            if (items.length === 0) return;
+            // 输入事件监听
+            input.addEventListener("input", debouncedSearch);
             
-            let activeIndex = -1;
+            // 键盘导航
+            input.addEventListener("keydown", function(e) {
+                if (!autocompleteDiv.classList.contains('show')) return;
+                
+                const items = autocompleteDiv.getElementsByClassName("autocomplete-item");
+                if (items.length === 0) return;
+                
+                let activeIndex = -1;
+                
+                // 找到当前激活的项目
+                for (let i = 0; i < items.length; i++) {
+                    if (items[i].classList.contains("active")) {
+                        activeIndex = i;
+                        break;
+                    }
+                }
+                
+                if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    activeIndex = (activeIndex + 1) % items.length;
+                    setActiveItem(items, activeIndex);
+                } else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    activeIndex = activeIndex - 1 < 0 ? items.length - 1 : activeIndex - 1;
+                    setActiveItem(items, activeIndex);
+                } else if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (activeIndex >= 0) {
+                        items[activeIndex].click();
+                    }
+                }
+            });
             
-            // 找到当前激活的项目
-            for (let i = 0; i < items.length; i++) {
-                if (items[i].classList.contains("active")) {
-                    activeIndex = i;
-                    break;
+            // 设置激活项目
+            function setActiveItem(items, index) {
+                for (let i = 0; i < items.length; i++) {
+                    items[i].classList.remove("active");
+                }
+                if (index >= 0 && index < items.length) {
+                    items[index].classList.add("active");
+                    items[index].scrollIntoView({ block: "nearest" });
                 }
             }
             
-            if (e.key === "ArrowDown") {
-                e.preventDefault();
-                activeIndex = (activeIndex + 1) % items.length;
-                setActiveItem(items, activeIndex);
-            } else if (e.key === "ArrowUp") {
-                e.preventDefault();
-                activeIndex = activeIndex - 1 < 0 ? items.length - 1 : activeIndex - 1;
-                setActiveItem(items, activeIndex);
-            } else if (e.key === "Enter") {
-                e.preventDefault();
-                if (activeIndex >= 0) {
-                    items[activeIndex].click();
+            // 点击其他地方隐藏自动匹配
+            document.addEventListener("click", function (e) {
+                if (e.target !== input && !autocompleteDiv.contains(e.target)) {
+                    autocompleteDiv.classList.remove('show');
                 }
-            }
-        });
-        
-        // 设置激活项目
-        function setActiveItem(items, index) {
-            for (let i = 0; i < items.length; i++) {
-                items[i].classList.remove("active");
-            }
-            if (index >= 0 && index < items.length) {
-                items[index].classList.add("active");
-                items[index].scrollIntoView({ block: "nearest" });
-            }
+            });
         }
-        
-        // 点击其他地方隐藏自动匹配
-        document.addEventListener("click", function (e) {
-            if (e.target !== input && !autocompleteDiv.contains(e.target)) {
-                autocompleteDiv.classList.remove('show');
-            }
-        });
-    }
 
     // 地图相关变量
     let map;
@@ -1007,14 +1028,13 @@
         
         // 为每个结果添加标记
         data.forEach(item => {
-            const pickupCity = item["Pickup/Delivery City"];
-            const originTerminal = item["Origin Terminal"];
-            const destTerminal = item["Dest Terminal"];
+            const fromCity = item["From"];
+            const toCity = item["To"];
             
-            // 添加Pickup City标记（城市图标）
-            if (pickupCity) {
+            // 添加From城市标记（城市图标）
+            if (fromCity) {
                 const marker = L.marker([52.52, 13.405], { // 示例坐标
-                    title: `Pickup City: ${pickupCity}`,
+                    title: `From: ${fromCity}`,
                     icon: L.divIcon({
                         className: 'city-icon',
                         html: '<i class="fas fa-city" style="color: #4a6580; font-size: 24px;"></i>',
@@ -1025,29 +1045,15 @@
                 markers.push(marker);
             }
             
-            // 添加Origin Terminal标记（火车站图标）
-            if (originTerminal) {
-                const marker = L.marker([52.52, 13.405], { // 示例坐标
-                    title: `Origin Terminal: ${originTerminal}`,
-                    icon: L.divIcon({
-                        className: 'terminal-icon',
-                        html: '<i class="fas fa-train" style="color: #2c3e50; font-size: 20px;"></i>',
-                        iconSize: [20, 20],
-                        iconAnchor: [10, 10]
-                    })
-                }).addTo(map);
-                markers.push(marker);
-            }
-            
-            // 添加Dest Terminal标记（火车站图标）
-            if (destTerminal) {
+            // 添加To城市标记（城市图标）
+            if (toCity) {
                 const marker = L.marker([53.5511, 9.9937], { // 示例坐标
-                    title: `Dest Terminal: ${destTerminal}`,
+                    title: `To: ${toCity}`,
                     icon: L.divIcon({
                         className: 'terminal-icon',
-                        html: '<i class="fas fa-train" style="color: #2c3e50; font-size: 20px;"></i>',
-                        iconSize: [20, 20],
-                        iconAnchor: [10, 10]
+                        html: '<i class="fas fa-city" style="color: #2c3e50; font-size: 24px;"></i>',
+                        iconSize: [24, 24],
+                        iconAnchor: [12, 12]
                     })
                 }).addTo(map);
                 markers.push(marker);
@@ -1107,68 +1113,28 @@ async function searchProducts() {
         // 过滤数据
         let filteredData = data;
         
-        // 根据Flow字段决定搜索逻辑
+        // 根据From和To字段决定搜索逻辑
         if (origin || destination) {
-            // 如果同时有origin和destination，需要确定是W方向还是E方向
+            // 如果同时有origin和destination
             if (origin && destination) {
-                // 尝试找到匹配的记录来确定方向
-                const westBoundMatches = data.filter(item => 
-                    item["Flow"] === "W" && 
-                    item["Pickup/Delivery City"] && 
-                    item["Pickup/Delivery City"].toLowerCase() === origin.toLowerCase() &&
-                    item["Dest Terminal"] && 
-                    item["Dest Terminal"].toLowerCase() === destination.toLowerCase()
+                filteredData = data.filter(item => 
+                    item["From"] && 
+                    item["From"].toLowerCase() === origin.toLowerCase() &&
+                    item["To"] && 
+                    item["To"].toLowerCase() === destination.toLowerCase()
                 );
-                
-                const eastBoundMatches = data.filter(item => 
-                    item["Flow"] === "E" && 
-                    item["Origin Terminal"] && 
-                    item["Origin Terminal"].toLowerCase() === origin.toLowerCase() &&
-                    item["Pickup/Delivery City"] && 
-                    item["Pickup/Delivery City"].toLowerCase() === destination.toLowerCase()
-                );
-                
-                if (westBoundMatches.length > 0) {
-                    // 使用西向逻辑
-                    filteredData = westBoundMatches;
-                } else if (eastBoundMatches.length > 0) {
-                    // 使用东向逻辑
-                    filteredData = eastBoundMatches;
-                } else {
-                    // 如果都找不到，尝试分别搜索
-                    filteredData = data.filter(item => {
-                        if (item["Flow"] === "W") {
-                            const originMatch = !origin || (item["Pickup/Delivery City"] && item["Pickup/Delivery City"].toLowerCase() === origin.toLowerCase());
-                            const destMatch = !destination || (item["Dest Terminal"] && item["Dest Terminal"].toLowerCase() === destination.toLowerCase());
-                            return originMatch && destMatch;
-                        } else if (item["Flow"] === "E") {
-                            const originMatch = !origin || (item["Origin Terminal"] && item["Origin Terminal"].toLowerCase() === origin.toLowerCase());
-                            const destMatch = !destination || (item["Pickup/Delivery City"] && item["Pickup/Delivery City"].toLowerCase() === destination.toLowerCase());
-                            return originMatch && destMatch;
-                        }
-                        return false;
-                    });
-                }
             } else if (origin) {
-                // 只有起点，查找所有可能的匹配
-                filteredData = data.filter(item => {
-                    if (item["Flow"] === "W" && item["Pickup/Delivery City"] && item["Pickup/Delivery City"].toLowerCase() === origin.toLowerCase()) {
-                        return true;
-                    } else if (item["Flow"] === "E" && item["Origin Terminal"] && item["Origin Terminal"].toLowerCase() === origin.toLowerCase()) {
-                        return true;
-                    }
-                    return false;
-                });
+                // 只有起点
+                filteredData = data.filter(item => 
+                    item["From"] && 
+                    item["From"].toLowerCase() === origin.toLowerCase()
+                );
             } else if (destination) {
-                // 只有终点，查找所有可能的匹配
-                filteredData = data.filter(item => {
-                    if (item["Flow"] === "W" && item["Dest Terminal"] && item["Dest Terminal"].toLowerCase() === destination.toLowerCase()) {
-                        return true;
-                    } else if (item["Flow"] === "E" && item["Pickup/Delivery City"] && item["Pickup/Delivery City"].toLowerCase() === destination.toLowerCase()) {
-                        return true;
-                    }
-                    return false;
-                });
+                // 只有终点
+                filteredData = data.filter(item => 
+                    item["To"] && 
+                    item["To"].toLowerCase() === destination.toLowerCase()
+                );
             }
         }
         
@@ -1198,14 +1164,13 @@ async function searchProducts() {
         // 显示地图
         showCoordinatesOnMap(filteredData);
         
-        
         // 生成表格HTML
         let tableHTML = `
             <table class="results-table">
                 <thead>
                     <tr>
-                        <th>Flow</th>
-                        <th>Pickup/Delivery City</th>
+                        <th>From</th>
+                        <th>To</th>
                         <th>Province</th>
                         <th>Origin Terminal</th>
                         <th>Dest Terminal</th>
@@ -1227,9 +1192,9 @@ async function searchProducts() {
         filteredData.forEach(item => {
             tableHTML += `
                 <tr>
-                    <td>${item['Flow'] || 'N/A'}</td>
-                    <td>${item['Pickup/Delivery City'] || 'N/A'}</td>
-                    <td>${item['Province'] || 'N/A'}</td>
+                    <td>${item['From'] || 'N/A'}</td>
+                    <td>${item['To'] || 'N/A'}</td>
+                    <td>${item['Province'] || '-'}</td>
                     <td>${item['Origin Terminal'] || 'N/A'}</td>
                     <td>${item['Dest Terminal'] || 'N/A'}</td>
                     <td>${item['Service Scope'] || 'N/A'}</td>
@@ -1238,8 +1203,8 @@ async function searchProducts() {
                     <td>${item['Total Cost'] ? '$' + item['Total Cost'].toLocaleString() : 'N/A'}</td>
                     <td>${item['Handling Fee'] ? '$' + item['Handling Fee'].toLocaleString() : 'N/A'}</td>
                     <td>${item["40' Payload Limited (ton)"] || 'N/A'}</td>
-                    <td>${item['Extra Cost of Overload'] ? '$' + item['Extra Cost of Overload'].toLocaleString() : 'N/A'}</td>
-                    <td>${item['Note'] || 'N/A'}</td>
+                    <td>${item['Extra Cost of Overload']|| "-"}</td>
+                    <td>${item['Note'] || '-'}</td>
                     <td>${item['Valid From'] || 'N/A'}</td>
                     <td>${item['Valid To'] || 'N/A'}</td>
                 </tr>
@@ -1264,7 +1229,7 @@ async function searchProducts() {
 
         tableHTML += `
              <div class="results-info">
-                 <i class="fas fa-check-circle"></i> Found ${filteredData.length} records matching your criteria
+                 If there is no route/price you want at this result, please contact our BD colleagues.
              </div>
          `; 
         // 显示结果
@@ -1332,18 +1297,9 @@ async function searchProducts() {
         
         // 然后尝试初始化数据相关功能
         try {
-            // 只有在数据存在时才初始化自动完成
-            if (typeof csvData !== 'undefined') {
-                const allCities = extractCities(csvData);
-                console.log("Available cities:", allCities);
-
-                // 设置自动完成
-                setupAutoComplete('originInput', allCities, 'originAutocomplete');
-                setupAutoComplete('destinationInput', allCities, 'destinationAutocomplete');
-            } else {
-                console.warn('csvData not found - autocomplete disabled');
-                // 可以在这里显示提示信息，告知用户需要数据才能使用搜索功能
-            }
+            // 使用allCities数组而不是从空数据中提取城市
+            setupAutoComplete('originInput', allCities, 'originAutocomplete');
+            setupAutoComplete('destinationInput', allCities, 'destinationAutocomplete');
         } catch (error) {
             console.error('Error initializing data components:', error);
         }

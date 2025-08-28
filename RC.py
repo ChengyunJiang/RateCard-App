@@ -39,22 +39,40 @@ hide_streamlit_style = """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 st.set_page_config(layout="wide")
-st.title("Rate Card Generator")
+st.title("📑 Rate Card Generator")
 
 # 1) 放在文件最上方：初始化开关
 if "hide_intro" not in st.session_state:
     st.session_state["hide_intro"] = False  # 初始显示横幅
 
 def intro_banner():
+    # st.markdown("""
+    # <div style='padding: 1rem; border-radius: 0.5rem; background-color: #F0F7F6;'>
+    #   <h3 style='color: #225560;'>👋 欢迎使用Rate Card生成器</h3>
+    #   <p style='font-size:16px; color:#444;'>
+    #     👉 上传前注意事项:
+
+    #     1. 每个Excel的表头都在第一行，即没有隐藏行（特别注意TrainCost_Xi'an）  
+    #     2. 一个Excel中只有一行表头（特别注意TrainCost_Chengdu）  
+    #     3. 拖车费从第三张sheet开始读取  
+    #   </p>
+    #   
+
+    #   </p>
+    # </div>
+    # """, unsafe_allow_html=True)
     st.markdown("""
-    <div style='padding: 1rem; border-radius: 0.5rem; background-color: #F0F7F6;'>
-      <h3 style='color: #225560;'>👋 欢迎使用Rate Card生成器</h3>
-      <p style='font-size:16px; color:#444;'>
-        本工具帮助您通过 <b>Train Cost</b>、<b>Buffer Table</b> 与 <b>FCL Net Cost</b>，
-        快速生成 <b>Rate Card<b>，体现各条路线的价格。
-      </p>
-    </div>
-    """, unsafe_allow_html=True)
+        <div style='padding: 1rem; border-radius: 0.5rem; background-color: #F0F7F6;'>
+        <h3 style='color: #225560;'>⚠️ 上传前注意事项</h3>
+        <div style='font-size:16px; color:#333; line-height:1.8; margin-left:0.2rem;'>
+            1. 每个Excel的表头都在第一行，即没有隐藏行（特别注意 TrainCost_Xi'an）<br>
+            2. 一个Excel中只有一行表头（特别注意 TrainCost_Chengdu）<br>
+            3. 拖车费从第三张 sheet 开始读取<br>
+            4. 请确认 Route 内容为传统<b>线路<b>
+        </div>
+        </div>
+        """, unsafe_allow_html=True)
+
     st.markdown("<div style='height:28px;'></div>", unsafe_allow_html=True)
 
 # 2) 页面顶部：按开关显示/隐藏横幅
@@ -68,11 +86,29 @@ with st.sidebar:
     buffer_file = st.file_uploader("Buffer", type=["xls", "xlsx"])
     # st.markdown("---")
     st.markdown("> 说明：本应用**不保存**任何数据；所有处理都在内存完成。")
+    # 👉 按钮控制显示/隐藏逻辑说明
+    if "show_logic" not in st.session_state:
+        st.session_state["show_logic"] = False
+
+    if st.button("📖 查看系统处理逻辑", use_container_width=True):
+        st.session_state["show_logic"] = not st.session_state["show_logic"]
+
+    if st.session_state["show_logic"]:
+        st.markdown("""
+        ### 系统处理逻辑
+        1. **上传文件**：需要上传 Train Cost（可多文件）、Truck（拖车费）、Buffer 三类表格。  
+        2. **Train Cost**：只保留月初价格，`Valid To` 自动改成月底，合并完成后的`Cost`已包含leasing/additional cost。
+        3. **Truck**：从第 3 个 sheet 开始读，换算时效为天，Cost 自动除以汇率。  
+        4. **Buffer**：支持在网页端编辑。
+        5. **生成总表**：以Buffer表中的线路为准，与Train Cost价格合并，最后与拖车费合并，得到 T-T、D-T、T-D 三种服务范围价格。  
+        6. **特殊规则**：出口 W 减 Handling Fee 200 RMB，路线名和站点做特殊调整（如马拉-罗兹）。  
+        7. **输出结果**：可下载 CSV，也可导出离线 HTML。  
+        """)
 
 # ---------- Column picking logic ----------
 STD_COLS = {
     "Flow": ["Flow"],
-    "Origin Terminal": ["origin terminal", "origin", "pol", "始发站", "起运站"],
+    "Origin Terminal": ["Origin Terminal", "origin terminal", "origin", "pol", "始发站", "起运站"],
     "Route": ["Route", "Routing","route", "线路", "去程"],
     "Dest Terminal": ["dest terminal", "destination terminal", "pod", "目的站", "到达站"],
     "Service Scope": ["service scope", "scope", "服务范围"],
@@ -97,13 +133,13 @@ def pick_first_match(colnames, patterns):
                 return c
     return None
 
-def detect_cost_col(colnames):
-    colnames = [str(c) for c in colnames]
-    for c in colnames:
-        lc = c.lower()
-        if "cost" in lc and "forecast" not in lc:
-            return c
-    return None
+# def detect_cost_col(colnames):
+#     colnames = [str(c) for c in colnames]
+#     for c in colnames:
+#         lc = c.lower()
+#         if "cost" in lc and "forecast" not in lc:
+#             return c
+#     return None
 
 def detect_leasing_col(colnames):
     colnames = [str(c) for c in colnames]
@@ -112,72 +148,97 @@ def detect_leasing_col(colnames):
             return c
     return None
 
-# 用括号把整个数字模式包起来（有一个捕获组）
-RE_NUM = r'(-?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)'
+# # 用括号把整个数字模式包起来（有一个捕获组）
+RE_NUM_ALL = re.compile(r"[-+]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?")
 
+# 统一：把列名里的 \n / 不间断空格 / 多空格 去掉
+def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
+    def norm(c):
+        c = str(c).replace("\u00A0", " ")   # nbsp
+        c = c.replace("\n", " ")
+        c = re.sub(r"\s+", " ", c)
+        return c.strip()
+    df = df.copy()
+    df.columns = [norm(c) for c in df.columns]
+    return df
+
+# 清理：把“表头文字跑到数据里”的行去掉（如某格 = 该列列名）
+def _drop_header_rows(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    for c in df.columns:
+        mask = df[c].astype(str).str.strip().str.lower() == str(c).strip().lower()
+        df = df.loc[~mask]
+    return df
 
 def normalize_train_cost(df: pd.DataFrame, source_file: str) -> pd.DataFrame:
+    # ★ 新增：标准化列名 + 去掉误入的数据表头行
+    df = _normalize_columns(df)
+    df = _drop_header_rows(df)
+
     cols = [str(c) for c in df.columns.tolist()]
     out = pd.DataFrame()
 
-    # 1) 固定字段映射
-    for name in ["Flow","Origin Terminal","Route","Dest Terminal","Service Scope","Lead-Time(Day)","Container Type", "Valid From","Valid To","remark"]:
+    # 1) 固定字段映射（原来的 STD_COLS 不用改；列名已被标准化，\n 已变空格）
+    for name in ["Flow","Origin Terminal","Route","Dest Terminal","Service Scope","Lead-Time(Day)","Container Type","Valid From","Valid To","remark"]:
         pats = STD_COLS.get(name, [name])
         col = pick_first_match(cols, pats)
         out[name] = df[col] if col else np.nan
 
-    # Lead-Time(Day) 数值化
+    # 2) Lead-Time(Day) 数值化
     if "Lead-Time(Day)" in out.columns:
         out["Lead-Time(Day)"] = pd.to_numeric(out["Lead-Time(Day)"], errors="coerce")
 
-    # 小工具：提取第一个数字
+    # 3) 提取数字的小工具（保留你的实现）
     def _num(s: pd.Series) -> pd.Series:
-        s = s.astype(str).str.replace("\u00A0", " ", regex=False).str.strip()
-        x = s.str.extract(RE_NUM, expand=False)
-        x = x.str.replace(",", "", regex=False)
-        return pd.to_numeric(x, errors="coerce").fillna(0.0)
+        s = s.astype(str).str.replace("\u00A0", " ", regex=False)
+        s = s.str.replace(r"\(([^)]+)\)", r"-\1", regex=True).str.strip()
+        lists = s.str.findall(RE_NUM_ALL)
+        def _avg(lst):
+            if not lst:
+                return 0.0
+            vals = [float(x.replace(",", "")) for x in lst]
+            return float(np.mean(vals))
+        return lists.apply(_avg).astype(float)
 
-    # 2) leasing：数值化
+    # 4) leasing
     leasing_col = detect_leasing_col(cols)
     leasing_num = _num(df[leasing_col]) if leasing_col else pd.Series(0.0, index=df.index)
     out["leasing"] = leasing_num
 
-    # 3) cost：把所有含 cost（排除 forecast）的列相加
+    # 5) cost：把所有含 cost（排除 forecast）的列相加
     cost_cols = [c for c in cols if ("cost" in c.lower()) and ("forecast" not in c.lower())]
     if cost_cols:
         parts = [_num(df[c]).rename(c) for c in cost_cols]
         cost_sum = pd.concat(parts, axis=1).sum(axis=1)
     else:
         cost_sum = pd.Series(0.0, index=df.index)
-
-    # 最终 cost = 所有 cost 之和 + leasing
     out["cost"] = cost_sum + leasing_num
 
-    # 4) Container Type：取含 container 的列的第一个非空
+    # 6) Container Type 兜底（列名已标准化，这步仍然保留更稳）
     container_cols = [c for c in cols if "container" in c.lower()]
     if container_cols:
         tmp = df[container_cols].astype(str).replace({"nan": np.nan, "None": np.nan}).bfill(axis=1)
         out["Container Type"] = tmp.iloc[:, 0].astype(str).str.strip()
         out.loc[out["Container Type"].isin(["", "nan", "None"]), "Container Type"] = np.nan
 
-    # 5) 文本列去空格 
+    # 7) 文本列去空格 & 统一大小写（可选：把 Flow 统一成大写）
     for c in ["Flow","Origin Terminal","Route","Dest Terminal","Service Scope","Valid From","Valid To","remark","Container Type"]:
         if c in out.columns:
             out[c] = out[c].astype(str).str.strip()
+    if "Flow" in out.columns:
+        out["Flow"] = out["Flow"].astype(str).str.upper().str.strip()
 
-    # 6) 列顺序
-    ordered = [c for c in NEED_ORDER if c in out.columns]  
+    # 8) 列顺序
+    ordered = [c for c in NEED_ORDER if c in out.columns]
     if "Container Type" in out.columns and "Container Type" not in ordered:
         ordered.append("Container Type")
     out = out.reindex(columns=ordered)
-    # out.drop(columns=["leasing"], inplace=True, errors="ignore")
+
+    # 如需隐藏中间列，保留你原注释：
+    out.drop(columns=["leasing"], inplace=True, errors="ignore")
+
     out["__source_file__"] = source_file
     return out
-
-def fix_leasing(series):
-    s = pd.Series(series).astype(str).str.replace("\u00A0"," ",regex=False).str.strip()
-    x = s.str.extract(RE_NUM, expand=False).str.replace(",", "", regex=False)
-    return pd.to_numeric(x, errors="coerce").fillna(0.0)
 
 
 # ---------- Main ----------
@@ -335,8 +396,8 @@ def build_total_cost_table(df_buffer, df_train, df_truck,
     final_df["Total Cost"]     = _as_num(final_df["Total Cost"])
     # final_df = final_df[[c for c in final_cols if c in final_df.columns]]
     final_df["Route"] = final_df["Route"].replace({
-        "传统线路": "Public Train",
-        "传统路线": "Public Train",
+        "传统线路": "Public",
+        "传统路线": "Public",
         "全程时刻表": "Super Express"
     })
     def _norm(s: pd.Series) -> pd.Series:
@@ -346,13 +407,12 @@ def build_total_cost_table(df_buffer, df_train, df_truck,
                 .str.replace(r"[\u2013\u2014\u2212]", "-", regex=True) 
                 .str.upper())
 
-    # 1. 成都 → Lodz 的 Super Express 改成 成都 → Malaszewicze 的 Public Train
+    # 1. 成都 → Lodz 的 Super Express 改成 成都 → Malaszewicze 的 Super Express
     mask_out = (
         _norm(final_df["Origin Terminal"]).eq("CHENGDU") &
         _norm(final_df["Dest Terminal"]).eq("LODZ") &
         _norm(final_df["Route"]).eq("SUPER EXPRESS")
     )
-    final_df.loc[mask_out, "Route"] = "Public Train"
     final_df.loc[mask_out, "Dest Terminal"] = "Malaszewicze"
 
     # 2. Lodz → 成都 的 Super Express 改成 Malaszewicze → 成都 的 Super Express
@@ -366,7 +426,7 @@ def build_total_cost_table(df_buffer, df_train, df_truck,
 
     # ---------- Remark & 全局附加列 ----------
     final_df["Remark"] = remark_text or ""
-    final_df["Extra cost of overload"] = overload_text or ""
+    final_df["Extra Cost of Overload"] = overload_text or ""
     mask_cd_ml = (
     ((final_df["Origin Terminal"] == "Chengdu") & (final_df["Dest Terminal"] == "Malaszewicze")) |
     ((final_df["Origin Terminal"] == "Malaszewicze") & (final_df["Dest Terminal"] == "Chengdu")))
@@ -378,13 +438,13 @@ def build_total_cost_table(df_buffer, df_train, df_truck,
         "Flow","Pickup/Delivery City","Province","Origin Terminal","Dest Terminal","Route",
         "Service Scope","Lead-Time(Day)","Valid From","Valid To",
         "Total Cost","Handling Fee",
-        "40' Payload Limited (ton)","Extra cost of overload",
+        "40' Payload Limited (ton)","Extra Cost of Overload",
         "Note","Remark"
     ]
     final_df = final_df[[c for c in ordered_cols if c in final_df.columns]]
     return final_df
 
-tab1, tab2 = st.tabs({"Data", "Text"})
+tab1, tab2 = st.tabs(["Data", "Text"])
 # ---------- Train Data Processing ----------
 with tab1:
     st.number_input("USD:CNY Rate", min_value=0.0, step=0.01, value=7.0, key="rate")
@@ -541,16 +601,16 @@ with tab2:
         st.session_state.setdefault(k, v)
 
     st.number_input("40' Payload Limited (ton)", min_value=0, step=1, key="payload40")
-    st.text_input("Extra cost of overload", key="overload_text")
+    st.text_input("Extra Cost of Overload", key="overload_text")
     st.text_area("Remark", height=160, key="remark_text")
 
 # ---------- Export HTML -------------------------------------------------------------------------
 #---------------------------------------------------------------------------------------------------------------
-# —— 可选：把 final_df 的列映射到 HTML 里期望的字段名
-# 如果你的 final_df 列名已经匹配，就删掉这个 mapping
 COLUMN_MAP = {
-    "Pickup/Delivery City": "Pickup/Delivery City",  # 改：直接映射到 HTML 需要的键
+    # 你已有的原始列名 → HTML 期望的列名（右边是最终输出给 HTML 的键）
+    "From": "From",
     "Province": "Province",
+    "To": "To",
     "Origin Terminal": "Origin Terminal",
     "Dest Terminal": "Dest Terminal",
     "Service Scope": "Service Scope",
@@ -560,71 +620,65 @@ COLUMN_MAP = {
     "Handling Fee": "Handling Fee",
     "Valid From": "Valid From",
     "Valid To": "Valid To",
-    "Extra cost of overload": "Extra Cost of Overload",      
-    "Note": "Note",                                         
-    "40' Payload Limited (ton)": "40' Payload Limited (ton)" 
+    "40' Payload Limited (ton)": "40' Payload Limited (ton)", 
+    "Extra Cost of Overload": "Extra Cost of Overload",
+    "Note": "Note",
+    "Remark": "Remark"
 }
-# COLUMN_MAP = {
-#     "Pickup/Delivery City": "Origin City/Terminal",
-#     "Province": "Province",
-#     "Origin Terminal": "Origin Terminal",
-#     "Dest Terminal": "Dest Terminal",
-#     "Service Scope": "Service Scope", 
-#     "Route": "Route",         
-#     "Lead-Time(Day)": "Lead-Time(Day)",
-#     "Total Cost": "Total Cost",
-#     "Handling Fee": "Handling Fee",
-#     "Valid From": "Valid From",
-#     "Valid To": "Valid To"
-# }
-#REQUIRED_COLS = list(COLUMN_MAP.values())
 
 REQUIRED_COLS = [
-    "Pickup/Delivery City",
-    "Origin Terminal",
-    "Dest Terminal",
-    "Province",
-    "Service Scope",
-    "Route",
+    "From", "Province", "To",
+    "Origin Terminal", "Dest Terminal",
+    "Service Scope", "Route",
     "Lead-Time(Day)",
-    "Total Cost",
-    "Handling Fee",
+    "Total Cost", "Handling Fee",
+    "Valid From", "Valid To",
     "40' Payload Limited (ton)",
     "Extra Cost of Overload",
-    "Note",
-    "Remark",
-    "Valid From",
-    "Valid To",
+    "Note","Remark"
 ]
 
 def _prepare_df_for_html(df: pd.DataFrame) -> pd.DataFrame:
     d = df.copy()
+    # 统一生成/复制输出列
     for src, dst in COLUMN_MAP.items():
         if src in d.columns:
             if dst != src:
                 d[dst] = d[src]
         else:
             d[dst] = np.nan
-    # 只保留前端需要的列，并按顺序排列
+
+    # 只保留前端需要的列（并按顺序）
     d = d[REQUIRED_COLS]
-    d = d.replace({np.nan: None})
+
+    # 数值列：保持为 float
     for col in ["Total Cost", "Handling Fee"]:
         if col in d.columns:
-            d[col] = pd.to_numeric(d[col], errors="coerce").fillna(0).astype(float)
-    return d
+            d[col] = pd.to_numeric(d[col], errors="coerce").fillna(0.0).astype(float)
 
+    # 日期列：转成字符串（避免 JSON 序列化成时间戳或 NaT）
+    for col in ["Valid From", "Valid To"]:
+        if col in d.columns:
+            d[col] = d[col].astype(str).replace({"NaT": "", "nat": ""})
+
+    # 其他空值 → None（让 JSON 为 null）
+    d = d.where(pd.notna(d), None)
+
+    return d
+import json, re, base64
 def inject_df_into_html(df: pd.DataFrame, template_path: str) -> str:
     html = Path(template_path).read_text(encoding="utf-8")
-    df_ready["Valid From"] = df_ready["Valid From"].astype(str)
-    df_ready["Valid To"] = df_ready["Valid To"].astype(str)
-    # 把示例数据块：const csvData = [...];
-    # 替换为我们生成的 JSON：const csvData = <json>;
-    payload = df.to_dict(orient="records")
-    json_str = json.dumps(payload, ensure_ascii=False)
 
-    pattern = r"const\s+csvData\s*=\s*\[(?:.|\n)*?\];"
-    replacement = f"const csvData = {json_str};"
+    # DataFrame -> JSON（确保数字是 number、日期是字符串）
+    payload = df.to_dict(orient="records")
+    json_bytes = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    b64 = base64.b64encode(json_bytes).decode("ascii")
+
+    # 用 Base64 注入，前端用 atob 再 JSON.parse，还原成数组
+    pattern = r"const\s+csvData\s*=\s*\[[\s\S]*?\];"
+    replacement = f"const csvData = JSON.parse(atob('{b64}'));"
     new_html = re.sub(pattern, replacement, html)
+
     return new_html
 
 
@@ -639,10 +693,58 @@ if buffer_file and train_files and truck_file:
         overload_text=st.session_state["overload_text"],
         note_text=st.session_state["note_text"],
     )
-    mask_tt = final_df["Service Scope"] == "T-T"
-    final_df.loc[mask_tt, "Pickup/Delivery City"] = final_df.loc[mask_tt, "Origin Terminal"]
-    final_df.loc[mask_tt, "Province"] = final_df.loc[mask_tt, "Province"]
+    def _norm(s):
+        if pd.isna(s):
+            return ""
+        return str(s).strip()
+
+    def _norm_scope(s):
+        # 统一成大写、去空格、统一短横线
+        s = _norm(s).upper().replace(" ", "")
+        s = s.replace("—", "-").replace("–", "-")
+        return s
+
+    def _norm_flow(s):
+        return _norm(s).upper()
+
+    def _compute_from(row):
+        flow = _norm_flow(row["Flow"])
+        scope = _norm_scope(row["Service Scope"])
+        # T-T：两端都是站点
+        if scope == "T-T":
+            return row["Origin Terminal"]
+        # 其它 scope：按 W/E 规则
+        if flow == "W":
+            return row["Pickup/Delivery City"]
+        elif flow == "E":
+            return row["Origin Terminal"]
+        # 兜底（未知 flow）：优先起点站，否则城市
+        return row["Origin Terminal"] if _norm(row["Origin Terminal"]) else row["Pickup/Delivery City"]
+
+    def _compute_to(row):
+        flow = _norm_flow(row["Flow"])
+        scope = _norm_scope(row["Service Scope"])
+        if scope == "T-T":
+            return row["Dest Terminal"]
+        if flow == "W":
+            return row["Dest Terminal"]
+        elif flow == "E":
+            return row["Pickup/Delivery City"]
+        # 兜底（未知 flow）：优先目的站，否则城市
+        return row["Dest Terminal"] if _norm(row["Dest Terminal"]) else row["Pickup/Delivery City"]
+
+    final_df["From"] = final_df.apply(_compute_from, axis=1)
+    final_df["To"]   = final_df.apply(_compute_to,   axis=1)
+
+    # 如需把 From/To 靠前显示，可重排列顺序（可选）
+    prefer_order = ["Flow", "Service Scope", "From", "To"]
+    rest = [c for c in final_df.columns if c not in prefer_order]
+    
+    # 生成df_final
+    final_df = final_df[prefer_order + rest]
+
     st.success(f"总表生成完成：{len(final_df)} 行")
+
     with st.expander("预览"):
         st.dataframe(final_df, use_container_width=True)
         st.download_button(
@@ -651,17 +753,18 @@ if buffer_file and train_files and truck_file:
             file_name="RC_Raw_DB.csv",
             mime="text/csv"
         )
+
     st.header("Export Rate Card HTML")    
     if "final_df" in globals():
         df_ready = _prepare_df_for_html(final_df)
-        html_template_path = "Rate Card.html"  
+        html_template_path = "RC.html"
         if Path(html_template_path).exists():
-            if st.button("📤 导出 Rate Card HTML"):
+            if st.button("📤 导出 Rate Card HTML", use_container_width=True):
                 out_html = inject_df_into_html(df_ready, html_template_path)
                 st.download_button(
                     label="下载 Rate Card.html",
                     data=out_html.encode("utf-8"),
-                    file_name="827.html",
+                    file_name="RateCard.html",
                     mime="text/html",
                     use_container_width=True
                 )
