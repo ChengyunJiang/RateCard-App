@@ -30,21 +30,6 @@ if "hide_intro" not in st.session_state:
     st.session_state["hide_intro"] = False  # 初始显示横幅
 
 def intro_banner():
-    # st.markdown("""
-    # <div style='padding: 1rem; border-radius: 0.5rem; background-color: #F0F7F6;'>
-    #   <h3 style='color: #225560;'>👋 欢迎使用Rate Card生成器</h3>
-    #   <p style='font-size:16px; color:#444;'>
-    #     👉 上传前注意事项:
-
-    #     1. 每个Excel的表头都在第一行，即没有隐藏行（特别注意TrainCost_Xi'an）  
-    #     2. 一个Excel中只有一行表头（特别注意TrainCost_Chengdu）  
-    #     3. 拖车费从第三张sheet开始读取  
-    #   </p>
-    #   
-
-    #   </p>
-    # </div>
-    # """, unsafe_allow_html=True)
     st.markdown("""
         <div style='padding: 1rem; border-radius: 0.5rem; background-color: #F0F7F6;'>
         <h3 style='color: #225560;'>⚠️ 上传前注意事项</h3>
